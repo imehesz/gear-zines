@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EP-1320 Medieval Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The A4 sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. Play &amp; Record</h2>
+            <div class="section">
+                <span class="bold">Live Record</span>
+                <ul class="tight">
+                    <li>Count-in: tap <span class="key">codex</span>, then <span class="key">fabula</span>. Four beats, then it rolls.</li>
+                    <li>No count-in: press <span class="key">codex</span> + <span class="key">fabula</span> together.</li>
+                    <li>From the pattern start: <span class="key">codex</span>, then <span class="key">altero</span> + <span class="key">fabula</span>.</li>
+                    <li>Punch out: <span class="key">codex</span> stops recording, keeps the beat rolling. <span class="key">fabula</span> stops all.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Pattern Length</span>
+                <ul class="tight">
+                    <li>Defaults to 1 bar (ln.1). Up to 99 bars per group.</li>
+                    <li>Set it: <span class="key">codex</span>, then <span class="key">&minus;</span> / <span class="key">+</span>. Hold <span class="key">codex</span> to change it on the fly.</li>
+                    <li>Double it: <span class="key">codex</span>, then hold <span class="key">altero</span> + <span class="key">+</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Step Sequence</span>
+                <ul class="tight">
+                    <li>Stopped, <span class="key">&minus;</span> / <span class="key">+</span> walk step by step.</li>
+                    <li>Write a note: hold <span class="key">codex</span> + <span class="key">paed</span>.</li>
+                    <li>Velocity: hold <span class="key">altero</span>, turn <span class="knob">X</span>. Duration: <span class="knob">Y</span>.</li>
+                    <li>Nudge: hold <span class="key">altero</span> + <span class="key">paed</span>, tap <span class="key">&minus;</span> / <span class="key">+</span> (ticks in free time, steps when quantized).</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Claves (Keys)</span>
+                <ul class="tight">
+                    <li><span class="key">claves</span> spreads one paed chromatically across all 12.</li>
+                    <li>Octave: hold <span class="key">claves</span> + <span class="key">&minus;</span> / <span class="key">+</span>. Transpose: hold <span class="key">claves</span> + another paed.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Erado &amp; Undo</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">erado</span> + <span class="key">paed</span> while playing to rub out notes as they pass.</li>
+                    <li>Hold until <b>TRK</b> blinks = wipe that paed's whole track.</li>
+                    <li><span class="key">erado</span> + group paeds until <b>PTN</b> = erase pattern. <span class="key">erado</span> + <span class="key">manus</span> until <b>SCN</b> = erase scene.</li>
+                    <li>Undo: <span class="key">altero</span> + <span class="key">grp B</span>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. Sonus &amp; Sonus Edito</h2>
+            <div class="section">
+                <span class="bold">Picking Sounds (sonus)</span>
+                <ul class="tight">
+                    <li>Press <span class="key">sonus</span>, hit a paed, then <span class="key">&minus;</span> / <span class="key">+</span> to browse. 200+ sounds on board.</li>
+                    <li><span class="key">altero</span> + <span class="key">&minus;</span> / <span class="key">+</span> jumps ten at a time.</li>
+                    <li>Know the number? Hold <span class="key">sonus</span> and type it on the paeds.</li>
+                    <li><span class="knob">X</span> level &nbsp; <span class="knob">Y</span> pitch.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Sonus Edito &mdash; <span class="key">altero</span> + <span class="key">sonus</span></span>
+                <p style="margin-bottom:3px;">Six pages, stepped through with <span class="key">&minus;</span> / <span class="key">+</span>:</p>
+                <ul class="tight">
+                    <li><b>sonus</b> &mdash; <span class="knob">X</span> play mode (oneshot / key / legato), <span class="knob">Y</span> pan.</li>
+                    <li><b>trim</b> &mdash; <span class="knob">X</span> start point, <span class="knob">Y</span> length.</li>
+                    <li><b>envelope</b> &mdash; <span class="knob">X</span> attack, <span class="knob">Y</span> release.</li>
+                    <li><b>caerbannog</b> &mdash; time stretch. <span class="knob">X</span> picks BPM or BAR mode, <span class="knob">Y</span> sets the sample's own tempo or length so it locks to the project.</li>
+                    <li><b>midi</b> &mdash; <span class="knob">X</span> channel, <span class="knob">Y</span> root note. Turns a paed into an external instrument.</li>
+                    <li><b>muto group</b> &mdash; only one sound in the group sounds at a time. Everything else cuts off.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Copy, Paste, Undo</span>
+                <ul class="tight">
+                    <li><span class="key">altero</span> + <span class="key">grp C</span> copies, <span class="key">altero</span> + <span class="key">grp D</span> pastes, <span class="key">altero</span> + <span class="key">grp B</span> undoes.</li>
+                    <li>In <b>manus</b>: once grabs the bar, twice grabs the whole pattern.</li>
+                    <li>In <b>sonus</b>: copies the sound. Press twice for every sound in the group. Pick the target paed before pasting.</li>
+                    <li>Bin a user sample: hold <span class="key">erado</span> + <span class="key">sonus</span> until <b>SND</b> blinks.</li>
+                </ul>
+            </div>
+            <p class="tip">Muto group is what makes hi-hats behave &mdash; put the closed and open hat on the same muto group and the closed one chokes the open one, like a real pedal.</p>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. Workflow &amp; Manus</h2>
+            <div class="section">
+                <span class="bold">The Hierarchy</span>
+                <p>9 <b>projects</b>. Each holds 4 <b>groups</b> (A&ndash;D), each group 99 <b>patterns</b>, arranged into up to 99 <b>scenes</b>.</p>
+            </div>
+            <div class="section">
+                <span class="bold">Getting Around (manus)</span>
+                <ul class="tight">
+                    <li><span class="key">manus</span> is home; the screen shows the current step.</li>
+                    <li>Hold <span class="key">manus</span> &mdash; pick a scene, 01 to 99.</li>
+                    <li>Hold <span class="key">manus</span> + paeds 1&ndash;9 &mdash; switch project.</li>
+                    <li>Hold a <span class="key">group</span> + <span class="key">&minus;</span> / <span class="key">+</span> &mdash; pick that group's pattern.</li>
+                    <li><span class="key">altero</span> + <span class="key">grp A</span> &mdash; jump to the next empty pattern.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Committo &mdash; <span class="key">altero</span> + <span class="key">manus</span></span>
+                <ul class="tight">
+                    <li>Stamps the current arrangement as a scene, then hands you a fresh one built on top of it.</li>
+                    <li>How you build structure: get a loop right, committo, tweak, committo again.</li>
+                    <li>Doubles as a duplicate when you want a variation.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">The Faedr</span>
+                <ul class="tight">
+                    <li>Out of the box it rides group level.</li>
+                    <li>Reassign: hold <span class="key">faedr</span>, pick a target from the labels above the paeds.</li>
+                    <li>Hold a group paed and move it to set that group's volume.</li>
+                    <li>Record the move: hold <span class="key">codex</span> and sweep it.</li>
+                    <li>Fine control: hold <span class="key">altero</span> while moving. Reset: <span class="key">altero</span> + <span class="key">faedr</span>.</li>
+                    <li>Wipe all automation: stopped, hold <span class="key">erado</span> + <span class="key">faedr</span> 2 seconds.</li>
+                </ul>
+            </div>
+            <p class="tip">Treat the groups as A drums, B bass, C melody, D loops &amp; foley. The whole machine assumes it.</p>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Lexicon</h2>
+            <div class="section">
+                <span class="bold">The Latin, Translated</span>
+                <ul class="tight">
+                    <li><span class="key">manus</span> home screen &mdash; scenes, patterns, projects</li>
+                    <li><span class="key">sonus</span> choose the sound on a paed</li>
+                    <li><span class="key">pocus</span> the effects rack</li>
+                    <li><span class="key">demus</span> the 9 demo songs</li>
+                    <li><span class="key">claves</span> keys / scale mode</li>
+                    <li><span class="key">tempus</span> tempo &amp; time signature</li>
+                    <li><span class="key">quantum</span> quantize, swing, note repeat</li>
+                    <li><span class="key">codex</span> record</li>
+                    <li><span class="key">fabula</span> play / stop</li>
+                    <li><span class="key">erado</span> erase</li>
+                    <li><span class="key">altero</span> shift &mdash; gateway to nearly every second function</li>
+                    <li><span class="key">faedr</span> the fader</li>
+                    <li><span class="key">paed</span> one of the 12 pads (also a number key)</li>
+                    <li><span class="key">necto</span> the loop / repeat trap</li>
+                    <li><span class="key">summa</span> master compressor</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Core Specs</span>
+                <ul class="tight">
+                    <li>128 MB: 96 MB medieval ROM, 32 MB yours (500 user samples).</li>
+                    <li>46 kHz / 16-bit, 32-bit internal chain.</li>
+                    <li>12 mono voices, or 6 stereo.</li>
+                    <li>Tempo 40&ndash;399 BPM.</li>
+                    <li>240 &times; 176 &times; 16 mm, 620 g.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">I/O &amp; Power</span>
+                <ul class="tight">
+                    <li>Audio in / out 3.5 mm. MIDI in / out TRS type A.</li>
+                    <li>Sync in / out for POs and old drum machines.</li>
+                    <li>4&times; AAA, or bus power over USB-C.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. Sampling, Chop &amp; Time</h2>
+            <div class="section">
+                <span class="bold">Sample Mode &mdash; <span class="key">altero</span> + <span class="key">demus</span></span>
+                <ul class="tight">
+                    <li>Hold a paed to record from the built-in mic or line in. It lights when it catches something.</li>
+                    <li><span class="key">&minus;</span> / <span class="key">+</span> pick the input: <b>LR</b> stereo, <b>L</b>, <b>R</b>, or <b>C</b> mono centre.</li>
+                    <li><span class="knob">X</span> and <span class="knob">Y</span> set the amp / record level.</li>
+                    <li>From a phone or laptop: in sample mode, press <span class="key">+</span> until the source reads <b>usb</b>, then hit a paed.</li>
+                    <li>Leave with <span class="key">manus</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Chop &mdash; <span class="key">altero</span> + <span class="key">demus</span> + <span class="key">demus</span></span>
+                <ul class="tight">
+                    <li><b>Auto-chop:</b> pick a group, <span class="key">&minus;</span> / <span class="key">+</span> sets the slice count. It follows the beat.</li>
+                    <li><b>Live chop:</b> tap paeds during playback to drop cut points by hand.</li>
+                    <li>Then <span class="knob">X</span> / <span class="knob">Y</span> nudge each slice's start and end.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Quantum</span>
+                <ul class="tight">
+                    <li><span class="knob">X</span> note interval &mdash; 8, 16 or 32 per bar, plus 8T (12) and 16T (24) for triplets. <span class="knob">Y</span> swing.</li>
+                    <li><span class="key">&minus;</span> / <span class="key">+</span> flips between quantized and free-time recording.</li>
+                    <li><b>Note repeat:</b> hold <span class="key">quantum</span> + <span class="key">paed</span> for rolls at the current interval.</li>
+                    <li><b>Quantum correctus</b> (<span class="key">altero</span> + <span class="key">quantum</span>): tidy one paed, leave the rest. Stopped: press a paed to straighten its steps. Playing: hold it to fix only what goes by.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Necto &mdash; <span class="key">altero</span> + <span class="key">tempus</span></span>
+                <ul class="tight">
+                    <li>A tempo-locked loop trap. <span class="knob">X</span> slides it, <span class="knob">Y</span> sets its length.</li>
+                    <li>Out with <span class="key">tempus</span> (instantly) or <span class="key">manus</span> (on the next bar).</li>
+                </ul>
+            </div>
+            <p class="tip">WAVs move over USB-C with the EP sample tool: teenage.engineering/apps/ep-sample-tool</p>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. Pocus (the FX)</h2>
+            <p>Press <span class="key">pocus</span>, sweep the <span class="key">faedr</span> to send a group in, and use <span class="key">&minus;</span> / <span class="key">+</span> to change which effect it lands on.</p>
+            <div class="section">
+                <span class="bold">The Rack</span>
+                <ul class="tight">
+                    <li><b>Dungeon Echo</b> (delay) &mdash; <span class="knob">X</span> echo time, <span class="knob">Y</span> feedback.</li>
+                    <li><b>Torture Chamber</b> (reverb) &mdash; <span class="knob">X</span> length, from small room to cathedral. <span class="knob">Y</span> colour, dark to bright.</li>
+                    <li><b>Distortion</b> &mdash; <span class="knob">X</span> drive, <span class="knob">Y</span> colour. A digital axe.</li>
+                    <li><b>Bardic Ensemble</b> (chorus) &mdash; <span class="knob">X</span> depth, <span class="knob">Y</span> speed.</li>
+                    <li><b>Filter</b> &mdash; <span class="knob">X</span> cutoff: left cuts the highs, right cuts the lows. <span class="knob">Y</span> resonance.</li>
+                    <li><b>Compressor</b> &mdash; <span class="knob">X</span> drive, <span class="knob">Y</span> speed.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Punch-In Pocus</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">pocus</span> and press the group paeds mid-performance for instant mangling.</li>
+                    <li>They are pressure sensitive &mdash; lean in harder for more.</li>
+                    <li>They stack. Hold two at once.</li>
+                    <li>Let go and it snaps straight back to dry.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Live Input Pocus</span>
+                <ul class="tight">
+                    <li>From pocus, press <span class="key">manus</span> to bring the live input into the rack.</li>
+                    <li><span class="knob">X</span> input volume, <span class="knob">Y</span> how much goes to the effects.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Summa &mdash; <span class="key">altero</span> + <span class="key">pocus</span></span>
+                <ul class="tight">
+                    <li>Master compressor across the whole mix. <span class="knob">X</span> drive, <span class="knob">Y</span> speed.</li>
+                </ul>
+            </div>
+            <p class="tip">Run a Pocket Operator, a guitar or a voice through the line in and the torture chamber becomes an outboard reverb.</p>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Systema &amp; Sync</h2>
+            <div class="section">
+                <span class="bold">Settings &mdash; <span class="key">altero</span> + <span class="key">erado</span></span>
+                <ul class="tight">
+                    <li>Walk with <span class="key">&minus;</span> / <span class="key">+</span>, confirm with <span class="key">intra</span>, and leave with <span class="key">manus</span>.</li>
+                    <li><b>Velocity:</b> paed settings &rarr; vel &rarr; off, hi (light touch) or low (heavy touch).</li>
+                    <li><b>Scale:</b> 12 of them, for claves mode.</li>
+                    <li><b>Metronome:</b> sequencer settings &rarr; on (rec + play), rec, or cnt (count-in only). Then press <span class="key">tempus</span> and turn <span class="knob">Y</span> up.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Tempus</span>
+                <ul class="tight">
+                    <li>Tap <span class="key">tempus</span> repeatedly to tap in a tempo.</li>
+                    <li><span class="knob">X</span> sets BPM (40&ndash;399), or hold <span class="key">tempus</span> and type it on the paeds.</li>
+                    <li>Time signature: <span class="key">manus</span> + <span class="key">tempus</span>, then <span class="knob">X</span> / <span class="knob">Y</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Sync Recipes</span>
+                <ul class="tight">
+                    <li><b>Two Medievals:</b> 3.5 mm from sync out to sync in, both set to 1/16.</li>
+                    <li><b>Drive a PO:</b> PO on <b>SY2</b>, Medieval sync out set to <b>8</b>. Start the PO, then hit <span class="key">fabula</span>.</li>
+                    <li><b>Follow a PO:</b> PO on <b>SY1</b> via a stereo-to-dual-mono cable, Medieval sync in set to <b>8</b>.</li>
+                    <li><b>Old drum machine:</b> sync in set to <b>24</b>.</li>
+                    <li><b>MIDI keyboard:</b> TRS-A cable, detected automatically. Press <span class="key">claves</span> to spread one paed across the keys.</li>
+                </ul>
+            </div>
+
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) - Using User Image -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="medieval.jpg" alt="Medieval minstrel illustration" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">EP&ndash;1320 &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
