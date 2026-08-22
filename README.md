@@ -21,14 +21,34 @@ The goal is not to reproduce the manual. It is to distill the parts you actually
 | Zine | Gear | Sheet |
 |---|---|---|
 | [`te_ep-1320_medieval/`](te_ep-1320_medieval/) | Teenage Engineering EP–1320 Medieval | US Letter landscape |
+| [`te_po-14_sub/`](te_po-14_sub/) | Teenage Engineering PO-14 sub | US Letter landscape |
+| [`te_po-32_tonic/`](te_po-32_tonic/) | Teenage Engineering PO-32 tonic | US Letter landscape |
+| [`te_po-33_ko/`](te_po-33_ko/) | Teenage Engineering PO-33 K.O! | US Letter landscape |
+| [`te_po-35_speak/`](te_po-35_speak/) | Teenage Engineering PO-35 speak | US Letter landscape |
+
+Every folder has the same two files — one HTML file, one cover image:
 
 ```
-te_ep-1320_medieval/
-├── ep_1320_medieval_zine.html   the zine — open it, print it
-└── medieval.jpg                 cover art
+te_po-33_ko/
+├── po_33_ko_zine.html   the zine — open it, print it
+└── ko.jpg               cover art
 ```
 
 The HTML has no dependencies and no build step. Open it in a browser and print.
+
+### On the Pocket Operators
+
+The four PO zines share a chassis — 16 keys, two knobs, 16-step patterns, and TE's
+SY0–SY5 sync table — so they are laid out the same way and the sync page is common
+to all of them.
+
+What is *not* common is the button that does the housekeeping, and it is the thing
+that catches people moving between units. Clearing a pattern is `record + pattern`
+on the PO-33 and PO-35, `acc + pattern` on the PO-32, and `key + pattern` on the
+PO-14. Each zine states its own unit's combos; do not carry them across.
+
+Covers are 1-bit line art on purpose. The whole point is a machine you can feed one
+sheet of paper — these print on a black-and-white laser with no grey to smear.
 
 ---
 

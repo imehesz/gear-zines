@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PO-33 K.O! Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    
+        /* Two-column table for the 16-slot sound / effect lists. Break-inside
+           avoid keeps a row from splitting across the column gutter. */
+        ul.cols2 {
+            column-count: 2;
+            column-gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        ul.cols2 li {
+            break-inside: avoid;
+            padding-left: 0;
+            text-indent: 0;
+            font-size: 5.5pt;
+            margin-bottom: 0.5px;
+        }
+
+        ul.cols2 li:before {
+            content: none;
+        }
+
+        /* Slot number in the two-column tables. */
+        .n {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. Play &amp; Write</h2>
+            <div class="section">
+                <span class="bold">Playing</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">sound</span> + <span class="key">1&ndash;16</span> to choose a slot, then press <span class="key">1&ndash;16</span> to play it.</li>
+                    <li>Nothing audible? Press <span class="key">write</span> once &mdash; you are in write mode.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Write Mode</span>
+                <ul class="tight">
+                    <li><span class="key">write</span> enters and exits. Press <span class="key">1&ndash;16</span> to put sounds or notes into the grid. Lit steps are active; press a lit step to remove it.</li>
+                    <li>A pattern is 16 steps.</li>
+                    <li><span class="key">play</span> to hear it back.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Live Record</span>
+                <ul class="tight">
+                    <li>While playing, hold <span class="key">write</span> and punch <span class="key">1&ndash;16</span>. Notes quantize to the current swing setting. Release <span class="key">write</span> when finished.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Tempo &amp; Volume</span>
+                <ul class="tight">
+                    <li><span class="key">bpm</span> cycles <b>HIP HOP</b> 80, <b>DISCO</b> 120, <b>TENCHO</b> 140.</li>
+                    <li>Fine tune: hold <span class="key">bpm</span> + turn <span class="knob">B</span>. Range 60&ndash;240.</li>
+                    <li>Swing: hold <span class="key">bpm</span> + turn <span class="knob">A</span>.</li>
+                    <li>Volume: hold <span class="key">bpm</span> + <span class="key">1&ndash;16</span>. Treat <b>5</b> as the headphone ceiling.</li>
+                </ul>
+            </div>
+            <p class="tip">Swing lives on the bpm button, and live record quantizes <b>to it</b> &mdash; so set the swing before you punch anything in, not after.</p>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. Tone, Filter, Trim</h2>
+            <p>Six parameters across three pages, both knobs on each. Press <span class="key">FX</span> to step between the pages.</p>
+            <div class="section">
+                <span class="bold">The Pages</span>
+                <ul class="tight">
+                    <li><b>TONE</b> &mdash; <span class="knob">A</span> pitch, <span class="knob">B</span> volume.</li>
+                    <li><b>FILTER</b> &mdash; <span class="knob">A</span> high-/low-pass, <span class="knob">B</span> resonance.</li>
+                    <li><b>TRIM</b> &mdash; <span class="knob">A</span> start point, <span class="knob">B</span> length.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Trim Is Where the Work Is</span>
+                <ul class="tight">
+                    <li>Trim is how you turn a sloppy grab into a usable hit. Cut the silence off the front and the tail off the back.</li>
+                    <li>In the <b>drum</b> section each slice trims <b>individually</b>, and the slice you edit is the <b>last one you triggered</b>.</li>
+                    <li>So: tap the slice, then turn the knob. Tap a different slice and the knobs are now editing that one instead.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Parameter Locking</span>
+                <ul class="tight">
+                    <li>While a pattern plays, hold <span class="key">write</span> and turn <span class="knob">A</span> / <span class="knob">B</span> to lock the currently selected parameters into the pattern.</li>
+                    <li>Only <b>tone</b> and <b>filter</b> are lockable. Trim is not.</li>
+                    <li>Locks apply to the currently selected sound.</li>
+                </ul>
+            </div>
+            <p class="tip">Filter sweeps locked over eight bars are the entire PO-33 sound. Lock one, then chain the pattern four times.</p>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. Sampling</h2>
+            <div class="section">
+                <span class="bold">Recording</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">record</span> + a key <span class="key">1&ndash;16</span>. The mic records for as long as you hold both, and the take lands in that slot.</li>
+                    <li>Plug a cable into <b>line in</b> and it samples from that instead of the mic. The jack decides.</li>
+                    <li>The LCD counts down the seconds you have left out of 40.</li>
+                    <li>Memory full? Delete something or record straight over an existing slot.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Choosing the Half</span>
+                <ul class="tight">
+                    <li>Record into a <b>melodic</b> slot to play the sample as a pitched instrument.</li>
+                    <li>Record into a <b>drum</b> slot to spread it across the keys as slices.</li>
+                    <li>You cannot convert one to the other later. Decide before you hold <span class="key">record</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Managing Sounds</span>
+                <ul class="tight">
+                    <li><b>Delete:</b> hold <span class="key">record</span> + <span class="key">sound</span> bins the currently selected sound.</li>
+                    <li><b>Copy a sound:</b> hold <span class="key">write</span> + <span class="key">sound</span>, press <span class="key">1&ndash;16</span> for the destination.</li>
+                    <li><b>Copy a single slice:</b> hold <span class="key">write</span> + <span class="key">sound</span>, press a drum key <span class="key">9&ndash;16</span>, then any key <span class="key">1&ndash;16</span>. Copies the last slice you triggered.</li>
+                </ul>
+            </div>
+            <p class="tip">40 seconds goes fast. Sample short and trim hard &mdash; a half-second vocal chop earns its place, four bars of a song does not.</p>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Lexicon</h2>
+            <div class="section">
+                <span class="bold">The Buttons</span>
+                <ul class="tight">
+                    <li><span class="key">sound</span> hold + <span class="key">1&ndash;16</span> picks the sound slot</li>
+                    <li><span class="key">pattern</span> hold + <span class="key">1&ndash;16</span> picks the pattern</li>
+                    <li><span class="key">bpm</span> tap for tempo; hold for volume, swing, fine tune</li>
+                    <li><span class="key">write</span> toggles rec mode &mdash; the rec symbol lights</li>
+                    <li><span class="key">play</span> start / stop</li>
+                    <li><span class="key">FX</span> effects, and the three knob pages</li>
+                    <li><span class="key">record</span> sampling &mdash; also delete, clear and sync</li>
+                    <li><span class="knob">A</span> <span class="knob">B</span> the two parameter knobs</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Melodic and Drum &mdash; the Big Idea</span>
+                <ul class="tight">
+                    <li>16 sound slots split into two halves, and a sample <b>behaves differently depending on which half you recorded it into</b>.</li>
+                    <li><b>Melodic</b> section: keys 1&ndash;16 are a scale, and each key triggers the <b>whole</b> sound.</li>
+                    <li><b>Drum</b> section: each key is a <b>slice</b> of the sound.</li>
+                    <li>Same recording, two instruments. Sample a bar of a break into both and you get a bassline and a chopped kit.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Numbers</span>
+                <ul class="tight">
+                    <li><b>40 seconds</b> of sample memory, shared across all slots. Seconds remaining show on the LCD while recording.</li>
+                    <li>16 patterns of 16 steps. Chains up to <b>128</b> &mdash; the longest in the range.</li>
+                    <li>Two AAA. Sleeps to a clock; battery status is <span class="key">sound</span> + <span class="key">bpm</span>.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. Patterns, Songs &amp; Data</h2>
+            <div class="section">
+                <span class="bold">Patterns</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">pattern</span> + <span class="key">1&ndash;16</span> to select. Blinking LED is the active one.</li>
+                    <li>Copy: hold <span class="key">write</span> + <span class="key">pattern</span>, press <span class="key">1&ndash;16</span> to paste there.</li>
+                    <li>Clear: <span class="key">record</span> + <span class="key">pattern</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Chaining a Song</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">pattern</span> and tap patterns in order. Up to <b>128</b>.</li>
+                    <li>Repeats allowed: <b>1,1,1,4</b> plays 1 three times, then 4, then loops.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Backup &amp; Transfer</span>
+                <ul class="tight">
+                    <li>Transmit: <span class="key">write</span> + <span class="key">sound</span> + <span class="key">play</span>.</li>
+                    <li>Receive: <span class="key">write</span> + <span class="key">sound</span> + <span class="key">record</span>.</li>
+                    <li>Unit to unit: 3.5mm stereo, line out to line in. Receiver goes into receive mode <b>first</b>.</li>
+                    <li>To tape: record the transmission on any stereo device, then play it back into line in with the unit receiving.</li>
+                    <li>Receiving <b>erases every sample and pattern</b> on the target the moment the transfer starts. Verify on a second unit if the original matters.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Lock Tab</span>
+                <ul class="tight">
+                    <li>Snapping it freezes all patterns &mdash; and disables sampling for good.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. Effects</h2>
+            <p>While playing, hold <span class="key">FX</span> + <span class="key">1&ndash;15</span>. With write mode on the effect is saved into the pattern. To wipe saved effects, hold <span class="key">FX</span> + <span class="key">16</span> in write mode.</p>                <ul class="cols2">
+                    <li><span class="n">1.</span> loop 16</li>
+                    <li><span class="n">2.</span> loop 12</li>
+                    <li><span class="n">3.</span> loop short</li>
+                    <li><span class="n">4.</span> loop shorter</li>
+                    <li><span class="n">5.</span> unison</li>
+                    <li><span class="n">6.</span> unison low</li>
+                    <li><span class="n">7.</span> octave up</li>
+                    <li><span class="n">8.</span> octave down</li>
+                    <li><span class="n">9.</span> stutter 4</li>
+                    <li><span class="n">10.</span> stutter 3</li>
+                    <li><span class="n">11.</span> scratch</li>
+                    <li><span class="n">12.</span> scratch fast</li>
+                    <li><span class="n">13.</span> 6 / 8 quantize</li>
+                    <li><span class="n">14.</span> retrigger pattern</li>
+                    <li><span class="n">15.</span> reverse</li>
+                    <li><span class="n">16.</span> no effect</li>
+                </ul>
+            <div class="section">
+                <span class="bold">How to Use Them</span>
+                <ul class="tight">
+                    <li><b>1&ndash;4</b> are a loop ladder. Walk down 1&rarr;4 and the loop tightens into a stutter &mdash; the classic build.</li>
+                    <li><b>11 / 12</b> scratch is the one people buy this thing for. Hold it over a vocal chop.</li>
+                    <li><b>13</b> 6/8 quantize flips a straight beat to triplets live.</li>
+                    <li><b>16</b> is <b>no effect</b> &mdash; it is the off switch, and in write mode it is the eraser.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Sync &amp; Setup</h2>
+            <div class="section">
+                <span class="bold">Sync Modes</span>
+                <p>Stereo cable between units. The signal splits: audio on the <b>right</b>, click on the <b>left</b>. Default is SY0.</p>
+                <ul class="tight">
+                    <li><b>SY0</b> in stereo &rarr; out stereo</li>
+                    <li><b>SY1</b> in stereo &rarr; out mono/sync</li>
+                    <li><b>SY2</b> in sync &rarr; out stereo</li>
+                    <li><b>SY3</b> in sync &rarr; out mono/sync</li>
+                    <li><b>SY4</b> in mono/sync &rarr; out stereo</li>
+                    <li><b>SY5</b> in mono/sync &rarr; out mono/sync</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Syncing</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">record</span> + press <span class="key">bpm</span> on the <b>master</b> to cycle modes.</li>
+                    <li>Press <span class="key">play</span> on the follower first &mdash; it waits for the clock. Then <span class="key">play</span> on the master.</li>
+                    <li>Chaining three POs: master <b>SY1</b> &rarr; middle <b>SY5</b> &rarr; last <b>SY4</b>.</li>
+                    <li>Sync levels must not exceed <b>5Vpp</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Clock &amp; Reset</span>
+                <ul class="tight">
+                    <li>Set time: <span class="knob">A</span> hours, <span class="knob">B</span> minutes, any key confirms.</li>
+                    <li>Alarm: <span class="key">sound</span> + <span class="key">pattern</span>, then <span class="key">1&ndash;16</span> for the pattern it wakes you with.</li>
+                    <li>Factory reset: hold <span class="key">pattern</span> + <span class="key">write</span> while inserting batteries.</li>
+                </ul>
+            </div>
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="ko.jpg" alt="Woodcut of a boxing glove mid-punch" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">PO&ndash;33 K.O! &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
