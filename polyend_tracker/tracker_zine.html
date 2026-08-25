@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polyend Tracker Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    
+        /* Two-column table for the 16-slot sound / effect lists. Break-inside
+           avoid keeps a row from splitting across the column gutter. */
+        ul.cols2 {
+            column-count: 2;
+            column-gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        ul.cols2 li {
+            break-inside: avoid;
+            padding-left: 0;
+            text-indent: 0;
+            font-size: 5.5pt;
+            margin-bottom: 0.5px;
+        }
+
+        ul.cols2 li:before {
+            content: none;
+        }
+
+        /* Slot number in the two-column tables. */
+        .n {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. Playing, Looping &amp; Song</h2>
+            <div class="section">
+                <span class="bold">Transport</span>
+                <ul class="tight">
+                    <li><span class="key">play</span> plays the pattern from its start. Press again to stop; again restarts from the beginning.</li>
+                    <li><span class="key">shift</span> + <span class="key">play</span> resumes from where you paused &mdash; and <b>with a range of steps selected it loops just that range</b>. New in OS 1.9.2, and the fastest way to work on eight bars without the other twenty-four.</li>
+                    <li><span class="key">song</span> + <span class="key">play</span> starts the song without leaving the pattern page. <span class="key">shift</span> + <span class="key">home</span>, stopped, resets the playhead to the top.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Changing Pattern Mid-Flight</span>
+                <ul class="tight">
+                    <li><span class="key">pattern</span> + <span class="key">&larr;&rarr;</span> <b>queues</b> the next pattern for the end of this one. The number blinks red while it waits.</li>
+                    <li><span class="key">pattern</span> + <span class="key">&uarr;&darr;</span> switches <b>immediately</b>. So do the bare arrows, the jog and the pads.</li>
+                    <li>Hold the <b>Pattern</b> screen button to see which patterns exist &mdash; lit pads are the ones with something in them.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Song Mode</span>
+                <ul class="tight">
+                    <li><span class="key">song</span> switches to it; <b>holding</b> <span class="key">song</span> just peeks at it from wherever you are.</li>
+                    <li><span class="key">play</span> starts at the current row, <span class="key">shift</span> + <span class="key">play</span> loops that row.</li>
+                    <li>Tempo: <span class="key">song</span> + jog, 40&ndash;800 BPM in whole beats. Add <span class="key">shift</span> for 0.1 steps.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Live Recording</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span> + <span class="key">rec</span> starts it. <span class="key">rec</span> alone during it keeps playing but drops out of record.</li>
+                    <li>Arm / disarm a track: <span class="key">shift</span> + <span class="key">rec</span> + its screen button. Disarmed tracks refuse to record.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. Fill</h2>
+            <p>The reason a pattern gets built in a minute instead of ten. It writes a whole range of steps at once, and it is invisible if nobody shows you.</p>
+            <div class="section">
+                <span class="bold">Getting There</span>
+                <ul class="tight">
+                    <li>In <span class="key">pattern</span>, press <span class="key">rec</span> &mdash; the box round the step turns red.</li>
+                    <li>Select a range: <span class="key">shift</span> + <span class="key">&uarr;&darr;&larr;&rarr;</span>.</li>
+                    <li>Choose the column you are filling: <span class="key">note</span>, <span class="key">inst</span>, <span class="key">FX1</span> or <span class="key">FX2</span>. It goes <b>solid</b> red.</li>
+                    <li>Press <b>Fill</b>, the 4th screen button.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Where? &mdash; Which Steps Get Touched</span>
+                <ul class="tight">
+                    <li><b>Note</b> / <b>FX</b> only overwrite steps that already have one. <b>No Note</b> / <b>No FX</b> only fill the blanks.</li>
+                    <li><b>Random</b> scatters across the range; <b>Density</b> sets how much of it, as a percentage.</li>
+                    <li><b>Each</b> places one every <b>Step</b> steps, 1&ndash;32. Straight sixteenths, or every third step.</li>
+                    <li><b>Euclidean</b> spreads <b>Event</b> hits, 1&ndash;32, as evenly as the length allows. Where the good rhythms come from &mdash; 8 steps, 3 events.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Fill Type &mdash; What Value Goes In</span>
+                <ul class="tight">
+                    <li><b>Constant</b> &mdash; the same value everywhere.</li>
+                    <li><b>From-To</b> &mdash; distributed across the range. This is your ramp: a filter sweep or a pan drift written in one press.</li>
+                    <li><b>Random</b> &mdash; random values between From and To.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Scale</span>
+                <ul class="tight">
+                    <li>Filling notes? Pick a <b>Scale</b> and the fill stays in key: chromatic, major, minor, the modes, harmonic and melodic minor, phrygian dominant, bebop major.</li>
+                </ul>
+            </div>
+            <p class="tip">Fill works over steps that already exist, and it <b>ignores Step Jump</b>. The selection is the only thing that decides where it lands.</p>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. Patterns &amp; Steps</h2>
+            <div class="section">
+                <span class="bold">What a Step Is</span>
+                <ul class="tight">
+                    <li>Four columns on each of 8 tracks: <b>note</b>, <b>instrument</b>, <b>FX1</b>, <b>FX2</b>. The dedicated buttons pick which one you are editing.</li>
+                    <li><b>Tap</b> a parameter button to <b>lock</b> the cursor to that column while you move around.</li>
+                    <li><b>Step Jump</b> auto-advances the cursor after each entry, so you can enter every fourth step without counting.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Pattern Size</span>
+                <ul class="tight">
+                    <li>Hold the <b>Pattern</b> screen button + jog to pick a pattern, <b>Length</b> + jog to set its rows.</li>
+                    <li><b>Extend</b> doubles the length by inserting empty steps. <b>Duplicate</b> doubles it <b>with</b> the steps copied. <b>Shrink</b> halves it by deleting every second step. Also under <b>More</b>: Invert, Copy / Paste Pattern, Render Selection, Pattern and Track Name.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Selecting</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span> + arrows selects a block of steps.</li>
+                    <li><span class="key">shift</span> + <span class="key">&uarr;</span> on the first step selects that <b>whole track</b>. Press <span class="key">&uarr;</span> again and it takes <b>every track</b>.</li>
+                    <li><span class="key">copy</span> copies, <span class="key">shift</span> + <span class="key">copy</span> pastes. <span class="key">del</span> resets a parameter to its default; <span class="key">shift</span> + <span class="key">del</span> deletes the thing outright.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Seeing More Tracks</span>
+                <ul class="tight">
+                    <li>Four tracks show by default; <span class="key">&larr;&rarr;</span> walks across the rest, MIDI tracks 9&ndash;12 included.</li>
+                    <li><span class="key">pattern</span> + <span class="key">note</span> shows all 8 tracks, notes only. Same with <span class="key">inst</span>, <span class="key">FX1</span>, <span class="key">FX2</span>.</li>
+                    <li>Hold <span class="key">pattern</span> + <b>two</b> of them for two columns at once. <span class="key">pattern</span> alone goes back to four.</li>
+                    <li>Mute: <span class="key">shift</span> + screen button 1&ndash;8. Instant, and dimmed keys are the muted ones.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Lexicon</h2>
+            <div class="section">
+                <span class="bold">The Pages</span>
+                <ul class="tight">
+                    <li><span class="key">pattern</span> the workbench &middot; <span class="key">song</span> arrangement &middot; <span class="key">perform</span> 12 live effect slots &middot; <span class="key">master</span> mixer and FX &middot; <span class="key">file</span> load, save, export &middot; <span class="key">config</span> settings</li>
+                    <li>Sampling side: <span class="key">loader</span> browse the card &middot; <span class="key">playback</span> play modes &middot; <span class="key">editor</span> trim and process &middot; <span class="key">recorder</span> capture &middot; <span class="key">inst params</span> per-instrument</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">The Eight Screen Buttons</span>
+                <ul class="tight">
+                    <li>They mean whatever is written above them, and that changes on every page. A <b>red underline</b> means the option only works in <span class="key">rec</span> mode; dimmed means it needs a selection first.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Global Combos</span>
+                <ul class="tight">
+                    <li><span class="key">master</span> + jog &mdash; master volume &middot; <span class="key">song</span> + jog &mdash; tempo, 40&ndash;800 BPM</li>
+                    <li><span class="key">shift</span> + jog &mdash; <b>bigger</b> value jumps &mdash; except on tempo, where it gives 0.1 BPM instead</li>
+                    <li><span class="key">copy</span> / <span class="key">shift</span> + <span class="key">copy</span> &mdash; copy / paste; <span class="key">del</span> resets to default, <span class="key">shift</span> + <span class="key">del</span> deletes</li>
+                    <li><span class="key">shift</span> + <span class="key">home</span> &mdash; back to the top</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Numbers</span>
+                <ul class="tight">
+                    <li><b>8 audio tracks</b>, one voice each &mdash; plus <b>tracks 9&ndash;12, which are MIDI only</b>, added in OS 1.9.0. Twelve in total, they always sit after track 8, and there is no way to hide them.</li>
+                    <li>Up to <b>255 patterns</b> per project. <b>1&ndash;128 steps</b> per pattern, 32 by default. <b>128 instruments</b> in the pool.</li>
+                    <li>About <b>133 seconds</b> of mono recording &mdash; the whole project's sample budget, not a per-take limit.</li>
+                    <li>7&Prime; 800&times;480 screen, 4&times;12 pads, one jog wheel.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. Instruments &amp; Sampling</h2>
+            <div class="section">
+                <span class="bold">Eight Play Modes</span>
+                <p>An instrument is a sample plus its settings, saved as a <b>.pti</b>. Set how it plays on <span class="key">playback</span>:</p>
+                <ul class="tight">
+                    <li><b>1-Shot</b> &mdash; start to end, once.</li>
+                    <li><b>Forward</b>, <b>Backward</b> and <b>Pingpong</b> loop.</li>
+                    <li><b>Slice</b> and <b>Beat Slice</b> &mdash; the sample cut up and spread across the notes.</li>
+                    <li><b>Wavetable</b> &mdash; the sample becomes the table of a synth.</li>
+                    <li><b>Granular</b> &mdash; grains of it, played as a cloud.</li>
+                    <li>It is a sampler, not a stretcher: a higher note plays the sample <b>faster</b>, a lower one slower.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Recording</span>
+                <ul class="tight">
+                    <li><span class="key">recorder</span>, then pick <b>Source</b>: Line In, Radio, <b>Mic LG</b> or <b>Mic HG</b>. Monitor on, set <b>Gain</b> before you commit.</li>
+                    <li><b>Everything records in mono</b>, including a stereo line in. Which side you get is Config &rarr; General &rarr; Line in channel: Stereo, Mono Left or Mono Right.</li>
+                    <li><b>You cannot sample and hear a pattern at the same time.</b> While recording the pattern still sends MIDI out, but no audio.</li>
+                    <li>Trim <b>Start</b> / <b>End</b> with <b>Zoom</b>, then <b>Save &amp; Load</b> (7th button) &mdash; it writes to /Recordings <b>and</b> loads it into the instrument list. Plain <b>Save</b> only writes the file.</li>
+                    <li>Mic in has <b>no phantom power</b> &mdash; dynamic mics, LG for hot ones, HG for quiet.</li>
+                    <li><b>Render Selection</b> under <b>More</b> bounces a selection back into a sample without leaving the box. Since 1.9.0 it cuts <b>hard at both ends</b> &mdash; select past the last step or you lose the reverb tail. <b>Export Song/Pattern</b> still keeps tails.</li>
+                </ul>
+            </div>
+            <p class="tip">There is an <b>FM radio</b> in here and it is a legitimate source. Reception improves with a cable or aerial in the output jack.</p>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. Step FX</h2>
+            <p>37 of them, two slots per step. Hold <span class="key">FX1</span> or <span class="key">FX2</span> + screen button <b>7</b> or <b>8</b> to open the built-in description, then scroll with the jog while still holding the FX button. In <span class="key">rec</span> mode, letting go writes it into the step.</p>
+            <ul class="cols2">
+                <li><span class="n">-</span> none</li>
+                <li><span class="n">g</span> volume LFO</li>
+                <li><span class="n">!</span> off</li>
+                <li><span class="n">h</span> panning LFO</li>
+                <li><span class="n">V</span> volume</li>
+                <li><span class="n">j</span> filter LFO</li>
+                <li><span class="n">P</span> panning</li>
+                <li><span class="n">k</span> position LFO</li>
+                <li><span class="n">M</span> micro-tune</li>
+                <li><span class="n">l</span> finetune LFO</li>
+                <li><span class="n">G</span> glide</li>
+                <li><span class="n">D</span> overdrive</li>
+                <li><span class="n">T</span> tempo</li>
+                <li><span class="n">L</span> low-pass</li>
+                <li><span class="n">I</span> swing</li>
+                <li><span class="n">B</span> band-pass</li>
+                <li><span class="n">m</span> micro move</li>
+                <li><span class="n">H</span> high-pass</li>
+                <li><span class="n">q</span> gate length</li>
+                <li><span class="n">s</span> delay</li>
+                <li><span class="n">C</span> chance</li>
+                <li><span class="n">t</span> reverb</li>
+                <li><span class="n">R</span> roll</li>
+                <li><span class="n">E</span> bit depth</li>
+                <li><span class="n">A</span> arpeggiator</li>
+                <li><span class="n">U</span> tune</li>
+                <li><span class="n">n</span> random note</li>
+                <li><span class="n">F</span> slide up</li>
+                <li><span class="n">i</span> random inst</li>
+                <li><span class="n">J</span> slide down</li>
+                <li><span class="n">f</span> random FX</li>
+                <li><span class="n">a</span>&ndash;<span class="n">f</span> MIDI CC</li>
+                <li><span class="n">v</span> random volume</li>
+                <li><span class="n">r</span> reverse</li>
+                <li><span class="n">p</span> position</li>
+                <li><span class="n">S</span> slice</li>
+            </ul>
+            <div class="section">
+                <span class="bold">How to Think About Them</span>
+                <ul class="tight">
+                    <li>An FX <b>does not need a note in the same step</b>. A lone filter cutoff acts on whatever is already sounding &mdash; that is how you automate.</li>
+                    <li><b>Random FX</b> (<span class="n">f</span>) randomises the <i>value</i> of the effect in the <b>other</b> slot of the same step, not its own.</li>
+                    <li>Also on the list: MIDI chords, plus one MIDI CC tag per CC slot.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Perform &amp; Setup</h2>
+            <div class="section">
+                <span class="bold">Perform Mode</span>
+                <ul class="tight">
+                    <li>12 slots, each holding one of <b>21</b> effects, played from the pads.</li>
+                    <li>Setting it up, <span class="key">rec</span> <b>on</b>: <span class="key">&larr;&rarr;</span> picks the slot, <span class="key">&uarr;&darr;</span> changes its effect, <span class="key">shift</span> + <span class="key">&larr;&rarr;</span> swaps two slots.</li>
+                    <li>Hold a <b>pad</b> + jog to set that row's value. <b>Pad row 1 is the reset row</b> &mdash; it returns the effect to default.</li>
+                    <li>Playing it, <span class="key">rec</span> <b>off</b>: a pad applies its value to the selected tracks. Held pad + jog changes a value <b>temporarily</b> and it snaps back on release.</li>
+                    <li>Pick tracks with the track buttons; <span class="key">shift</span> + track mutes one.</li>
+                    <li>Live remix: <b>track</b> + jog swaps that track's pattern <b>now</b>; <b>track</b> + <span class="key">&larr;&rarr;</span> waits for the current pattern to end.</li>
+                    <li>The perform preset is saved <b>globally</b> by default. Config switches it to per-project.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Round the Back</span>
+                <ul class="tight">
+                    <li>3.5mm out (headphones too), line in, mic in, MIDI out, MIDI in &mdash; <b>Type B</b> adapters, so a Type A cable will not work.</li>
+                    <li>Micro SD, <b>pins facing down</b>.</li>
+                    <li>USB-C power, 5 V 1 A &mdash; any decent power bank runs it all day.</li>
+                </ul>
+                <p class="tip">The command buttons are <b>not backlit</b>. On a dark stage you work from memory &mdash; which is what this sheet is for.</p>
+            </div>
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="tracker.jpg" alt="Woodcut of a hand turning the jog wheel of a groovebox with a wide pad grid" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">POLYEND TRACKER &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

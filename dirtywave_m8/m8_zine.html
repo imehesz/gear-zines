@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dirtywave M8 Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    
+        /* Two-column table for the 16-slot sound / effect lists. Break-inside
+           avoid keeps a row from splitting across the column gutter. */
+        ul.cols2 {
+            column-count: 2;
+            column-gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        ul.cols2 li {
+            break-inside: avoid;
+            padding-left: 0;
+            text-indent: 0;
+            font-size: 5.5pt;
+            margin-bottom: 0.5px;
+        }
+
+        ul.cols2 li:before {
+            content: none;
+        }
+
+        /* Slot number in the two-column tables. */
+        .n {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. Instruments</h2>
+            <div class="section">
+                <span class="bold">Seven Types</span>
+                <ul class="tight">
+                    <li><b>WAVSYNTH</b> wavetable and noise &middot; <b>MACROSYN</b> over 40 models, ported from Mutable Braids &middot; <b>SAMPLER</b> &middot; <b>FMSYNTH</b> 4-op, 12 algorithms &middot; <b>HYPERSYNTH</b> 6-note stereo chords &middot; <b>MIDI OUT</b> with 10 user CCs &middot; <b>EXTERNAL INST</b>, MIDI out with the audio coming back through M8's filters and sends.</li>
+                    <li><b>NONE</b> is not a bug &mdash; it is how you and the M8 both know a slot is free.</li>
+                    <li>128 instruments per song, each with its own table, plus 128 more tables you can assign freely.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Getting Around</span>
+                <ul class="tight">
+                    <li><span class="key">opt</span>+<span class="key">&larr;&rarr;</span> previous / next instrument &middot; <span class="key">opt</span>+<span class="key">&uarr;&darr;</span> jumps &plusmn;16.</li>
+                    <li><span class="key">edit</span>+<span class="key">play</span> previews the instrument.</li>
+                    <li><span class="key">shift</span>+<span class="key">opt</span> copies the whole instrument, <span class="key">shift</span>+<span class="key">edit</span> pastes it &mdash; and pressing it again undoes the paste.</li>
+                    <li><span class="key">shift</span>+<span class="key">&uarr;</span> is the modulation view; again is the Instrument Pool, all 128 slots at once.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Modulation</span>
+                <ul class="tight">
+                    <li>Four slots per instrument: <b>AHD</b>, <b>ADSR</b>, <b>DRUM</b>, <b>LFO</b>, <b>TRIG</b> (fired by another track), <b>TRACKING</b> (note or velocity).</li>
+                    <li>ADSR only reaches release if the phrase has an <b>OFF</b> note or command. Without one it sustains forever.</li>
+                    <li>Set <b>DEST</b> to MOD AMT / RATE / BOTH and a slot modulates its neighbour: 1&rarr;2, 2&rarr;3, 3&rarr;4, 4&rarr;1.</li>
+                </ul>
+            </div>
+            <p class="tip">Highlight any instrument parameter, then <span class="key">shift</span>+<span class="key">&larr;</span> or <span class="key">shift</span>+<span class="key">&rarr;</span> to the phrase or table &mdash; the default FX command is now <b>that parameter</b>. It is how you look up the command for anything.</p>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. Playing &amp; Live</h2>
+            <div class="section">
+                <span class="bold">Play Means Different Things</span>
+                <ul class="tight">
+                    <li><span class="key">play</span> plays what you are looking at: the song from the cursor in song view, otherwise just that chain, phrase or instrument.</li>
+                    <li><span class="key">shift</span>+<span class="key">play</span> plays <b>all tracks</b> from the song cursor no matter which view you are in. This is the one you want.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Mutes &amp; Solos &mdash; Anywhere</span>
+                <ul class="tight">
+                    <li><span class="key">opt</span>+<span class="key">shift</span> mutes the current track. <span class="key">opt</span>+<span class="key">play</span> solos it.</li>
+                    <li>Both are momentary <b>unless you release OPTION first</b> &mdash; that latches them.</li>
+                    <li><span class="key">opt</span>+<span class="key">shift</span>+<span class="key">play</span> clears every mute and solo.</li>
+                    <li>These work in every view, not just the mixer.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Song View</span>
+                <ul class="tight">
+                    <li><span class="key">opt</span>+<span class="key">&larr;&rarr;</span> solos everything to that side of the cursor.</li>
+                    <li><span class="key">&larr;</span>+<span class="key">play</span> cues the selected row while running.</li>
+                    <li><span class="key">opt</span>+<span class="key">&uarr;&darr;</span> jumps 16 rows.</li>
+                    <li><span class="key">opt</span> held with playback stopped shows the track's running time.</li>
+                    <li><span class="key">opt</span> <span class="key">opt</span> <span class="key">opt</span> sets or clears a bookmark on a chain.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Live Mode</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span>+<span class="key">&larr;</span> from song view enters and exits it. Tracks start, cue and stop independently from anywhere in the song.</li>
+                    <li>A cued track waits for the playing chain to end. Change that under <b>LIVE QUANTIZE</b> in the project view.</li>
+                    <li>Loading a song while one plays queues it to the end of the chain &mdash; that is the set-change.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">File Browser</span>
+                <ul class="tight">
+                    <li><span class="key">&larr;</span> top of list, <span class="key">&rarr;</span> bottom, <span class="key">opt</span>+<span class="key">&uarr;&darr;</span> skips 8, <span class="key">play</span> previews, <span class="key">shift</span>+<span class="key">opt</span> sorts, <span class="key">opt</span>+<span class="key">edit</span> deletes, <span class="key">opt</span> exits.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. The Grid Language</h2>
+            <p>Song, chain, phrase and table are all grids, and they all take the same handful of commands. Learn these once and the whole machine opens.</p>
+            <div class="section">
+                <span class="bold">Values</span>
+                <ul class="tight">
+                    <li><span class="key">edit</span> on an empty cell &ldquo;--&rdquo; inserts the last value you edited or deleted.</li>
+                    <li><span class="key">edit</span>+<span class="key">&uarr;&darr;</span> coarse, <span class="key">edit</span>+<span class="key">&larr;&rarr;</span> fine. On a note column that is octaves and semitones.</li>
+                    <li><span class="key">edit</span>+<span class="key">opt</span> cuts the value, or resets a parameter to its default.</li>
+                    <li><span class="key">edit</span> <span class="key">edit</span> double-tap creates a <b>new unused</b> chain, phrase, instrument or table on that column.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Selection</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span>+<span class="key">opt</span> enters selection mode. Move the cursor to grow the block.</li>
+                    <li><span class="key">opt</span> copies and exits &middot; <span class="key">edit</span>+<span class="key">opt</span> cuts &middot; <span class="key">shift</span>+<span class="key">edit</span> pastes.</li>
+                    <li><span class="key">edit</span>+<span class="key">&uarr;&darr;</span> inside a selection shifts the contents up or down.</li>
+                    <li>One column, several rows, then <span class="key">shift</span>+<span class="key">edit</span> &mdash; <b>interpolates</b> between the top and bottom values. Ramps for free.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Clone &mdash; the Important One</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span>+<span class="key">opt, then edit</span> copies what is under the cursor into a <b>new number</b>.</li>
+                    <li>On song view, <span class="key">shift</span>+<span class="key">opt, then edit edit</span> deep-clones: the chain <b>and</b> every phrase inside it.</li>
+                </ul>
+            </div>
+            <p class="tip">A star on the title (<b>PHRASE 00*</b>) means that phrase plays somewhere else too. Edit it and you edit every one of them. Clone it first.</p>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Lexicon</h2>
+            <div class="section">
+                <span class="bold">Four Keys and a Cross</span>
+                <ul class="tight">
+                    <li><span class="key">edit</span> is also <b>YES</b> / enter. <span class="key">opt</span> is also <b>NO</b> / exit a sub-view.</li>
+                    <li><span class="key">shift</span> on its own does nothing at all.</li>
+                    <li>Notation: <span class="key">a</span>+<span class="key">b</span> means hold a, press b. <span class="key">a, then b</span> means press and release a, then press b.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">How a Song Is Built</span>
+                <ul class="tight">
+                    <li>8 tracks, each <b>monophonic</b> &mdash; one note at a time, each with its own play position.</li>
+                    <li>A track plays a vertical list of <b>chains</b>. A chain is up to 16 <b>phrases</b> plus a transpose column. A phrase is 16 steps of note, volume, instrument and three FX columns.</li>
+                    <li>An empty phrase cell ends the chain; an empty chain cell loops the track to its top. Chains of different lengths drift apart on purpose &mdash; use an empty chain to hold a silent track in step.</li>
+                    <li>256 song rows. Park experiments on the unused ones underneath.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Views</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span>+<span class="key">direction</span> moves between views. The mini-map at the bottom right shows where you are.</li>
+                    <li>Left to right: <b>song &rarr; chain &rarr; phrase &rarr; instrument &rarr; table</b>.</li>
+                    <li>Above: <b>project</b> over song, <b>groove</b> over phrase, <b>modulation</b> then <b>instrument pool</b> over instrument. Below song: <b>mixer</b>, then <b>send effects</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Hex</span>
+                <ul class="tight">
+                    <li>Everything counts 0&ndash;9 then A&ndash;F. <b>40</b> is 64. <b>FF</b> is 255.</li>
+                    <li>Two digits often mean two things: <b>ARP37</b> is +3 semitones then +7. The help line at the bottom of the screen translates while you edit.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. Sampling</h2>
+            <div class="section">
+                <span class="bold">Samples Stream Off the Card</span>
+                <ul class="tight">
+                    <li>Nothing loads into memory, so there is no length limit &mdash; but the card's <b>random</b> read speed is the whole ballgame. Use a card off dirtywave.com/sd.</li>
+                    <li><b>CPU TOO BUSY</b> is almost always the card. Three cures: mono where stereo earns nothing (kicks), 16- or 8-bit, and stop playing samples an octave or more above their recorded pitch &mdash; each octave doubles the data rate. 1- or 2-channel PCM <b>.wav</b> only.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Recording</span>
+                <ul class="tight">
+                    <li>Instrument TYPE = <b>SAMPLER</b>, then <span class="key">edit</span> on <b>REC.</b> (<b>EDIT</b> if a sample is loaded). <span class="key">opt</span> leaves.</li>
+                    <li>Start with <span class="key">edit</span> on <b>START</b> &mdash; or with the <b>power button</b>, which keeps the key click out of a mic take.</li>
+                    <li><b>SRC</b> picks line, mic (Model:02), USB or TR1&ndash;8; <b>ARM</b> starts on a threshold. <b>Name and SAVE before leaving the view.</b></li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Editing</span>
+                <ul class="tight">
+                    <li><b>SELECT</b> sets the range; <span class="key">opt</span>+<span class="key">&uarr;&darr;</span> snaps the marker to the tempo in beats.</li>
+                    <li><b>PROCESS</b>, then <span class="key">edit</span> again to run it: crop, delete, duplicate, normalize, silence, reverse, invert, fade, xfade loop, mono, downsample, 16- or 8-bit, <b>SLICE:AUTO</b> by transient, or even divisions.</li>
+                    <li>Lazy chop: with the song playing, tap <span class="key">edit</span> on the slice row to drop a marker at the play-head.</li>
+                    <li>128 markers, saved <b>inside the wav</b>. With SLICE set to <b>01 FILE</b> they map up from C-1; <b>SLI</b> cues them.</li>
+                </ul>
+            </div>
+            <p class="tip">Song view, select a block, then double-tap <span class="key">edit</span>: <b>Selection to Sample</b> renders it into a new instrument.</p>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. FX Commands</h2>
+            <p>Three columns per step, in phrases and in tables. Hold <span class="key">edit</span> and press <span class="key">&uarr;&darr;</span> on a command column for the help browser &mdash; pick with the direction keys, release <span class="key">edit</span> to insert it.</p>
+            <ul class="cols2">
+                <li><span class="n">ARP</span> arpeggio</li>
+                <li><span class="n">CHA</span> chance</li>
+                <li><span class="n">DEL</span> delay row</li>
+                <li><span class="n">GRV</span> groove</li>
+                <li><span class="n">GGR</span> groove, all</li>
+                <li><span class="n">HOP</span> jump row</li>
+                <li><span class="n">INS</span> change instr.</li>
+                <li><span class="n">KIL</span> kill note</li>
+                <li><span class="n">NTH</span> every nth loop</li>
+                <li><span class="n">OFF</span> note off</li>
+                <li><span class="n">PBN</span> pitch bend</li>
+                <li><span class="n">PSL</span> portamento</li>
+                <li><span class="n">PVB</span> vibrato</li>
+                <li><span class="n">RET</span> retrigger</li>
+                <li><span class="n">REP</span> repeat cmd</li>
+                <li><span class="n">RTO</span> repeat limit</li>
+                <li><span class="n">RND</span> randomise</li>
+                <li><span class="n">RNL</span> rand. left</li>
+                <li><span class="n">SCA</span> track scale</li>
+                <li><span class="n">SED</span> random seed</li>
+                <li><span class="n">SNG</span> song hop</li>
+                <li><span class="n">TBL</span> table</li>
+                <li><span class="n">TBX</span> aux table</li>
+                <li><span class="n">TIC</span> table speed</li>
+                <li><span class="n">TPO</span> tempo</li>
+                <li><span class="n">TSP</span> transpose</li>
+                <li><span class="n">VOL</span> volume</li>
+                <li><span class="n">PIT</span> pitch</li>
+                <li><span class="n">DJC</span> dj filter</li>
+                <li><span class="n">VT1</span>&ndash;<span class="n">VT8</span> trk vol</li>
+            </ul>
+            <div class="section">
+                <span class="bold">The Ones With Teeth</span>
+                <ul class="tight">
+                    <li><b>CHA1F</b> gives the note about a 1-in-16 chance and leaves the other commands at 100%. X is everything left of the command, Y everything right.</li>
+                    <li><b>REP</b> is sticky: it keeps incrementing across rows and phrases until a new command or <b>REP00</b> stops it. A <b>^^</b> in the lane means one is still running from an earlier phrase.</li>
+                    <li><b>HOPFF</b> stops that track dead.</li>
+                    <li><b>DJC</b> sweeps the global DJ filter: <b>80</b> is off, below it low-pass, above it high-pass.</li>
+                    <li><b>NTH</b> skips by loop count &mdash; the fill that only lands every fourth time round.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Mixer, Project &amp; Setup</h2>
+            <div class="section">
+                <span class="bold">Mixer</span>
+                <ul class="tight">
+                    <li><b>OUTPUT VOL</b> returns to <b>F0</b> at every power-up whatever you left it at &mdash; deliberate ear protection, not a fault.</li>
+                    <li><span class="key">shift</span>+<span class="key">opt</span> snapshots the <b>entire song</b>; <span class="key">shift</span>+<span class="key">edit</span> recalls it. A free undo before you wreck something live.</li>
+                    <li><span class="key">opt</span>+touchscreen assigns the touch axis to the highlighted parameter; <span class="key">opt</span>+a MIDI CC maps that CC.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Project</span>
+                <ul class="tight">
+                    <li>Tap <span class="key">edit</span> rhythmically on <b>TEMPO</b> for tap tempo. <b>TRANSPOSE</b>, <b>GROOVE</b> and <b>SCALE</b> land when you <b>release</b> the edit key &mdash; dial mid-bar, drop on the beat.</li>
+                    <li><b>CLEAR UNUSED</b> frees every chain, phrase, instrument and table the song does not use. <b>RENDER</b> writes 44.1kHz wavs to /Renders, mixed or as stems.</li>
+                    <li><b>Samples are not stored in the project file.</b> Move one and the song loads without it. <b>BUNDLE</b> gathers all three into /Bundles &mdash; do that before tidying the card.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Hardware</span>
+                <ul class="tight">
+                    <li>3.5mm TRS <b>Type A</b> MIDI in and out. Stereo line in, through the effects. USB carries power, class-compliant audio, MIDI and the virtual display.</li>
+                    <li>Power button: 1 second on, 2 off, <b>7</b> to force off if it locks up.</li>
+                </ul>
+            </div>
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="m8.jpg" alt="Woodcut of two hands holding a handheld tracker, columns of data falling from its screen" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">DIRTYWAVE M8 &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

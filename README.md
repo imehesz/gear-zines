@@ -20,6 +20,9 @@ The goal is not to reproduce the manual. It is to distill the parts you actually
 
 | Zine | Gear | Sheet |
 |---|---|---|
+| [`akai_mpc-one/`](akai_mpc-one/) | Akai MPC One / MPC One+ | US Letter landscape |
+| [`dirtywave_m8/`](dirtywave_m8/) | Dirtywave M8 (Model:01 / Model:02) | US Letter landscape |
+| [`polyend_tracker/`](polyend_tracker/) | Polyend Tracker | US Letter landscape |
 | [`te_ep-1320_medieval/`](te_ep-1320_medieval/) | Teenage Engineering EP–1320 Medieval | US Letter landscape |
 | [`te_po-14_sub/`](te_po-14_sub/) | Teenage Engineering PO-14 sub | US Letter landscape |
 | [`te_po-32_tonic/`](te_po-32_tonic/) | Teenage Engineering PO-32 tonic | US Letter landscape |
@@ -49,6 +52,40 @@ PO-14. Each zine states its own unit's combos; do not carry them across.
 
 Covers are 1-bit line art on purpose. The whole point is a machine you can feed one
 sheet of paper — these print on a black-and-white laser with no grey to smear.
+
+### On the MPC One, the M8 and the Tracker
+
+These three do not share a chassis with anything else here, and all are moving targets,
+so each zine states the documentation it was written against.
+
+The **MPC One** zine follows **MPC Standalone OS 3.x**. The silkscreen on the panel is
+from the 2.x era and no longer matches in one place that matters: `Prog Edit` now opens
+**Track Edit**, because what 2.x called a *program* is a *track* in 3. Everything else
+on the zine's button page is a hardware combo and is the same on both. The MPC One+ is
+the same machine for these purposes except for its power supply, its storage, and the
+Link port — which it does not have.
+
+The **M8** zine follows **Operation Manual v6.0.0** and covers Model:01 and Model:02.
+The only split between the two is the microphone: Model:02 has one, Model:01 does not,
+so the `SRC` list in the sample recorder is one entry shorter on an 01.
+
+The **Polyend Tracker** zine is written for **OS 1.9.2**, the current firmware, using the
+official manual v1.9.2a *plus Polyend's own release notes* — because on this machine the
+two disagree.
+
+**Where the manual and the firmware conflict, the zine follows the firmware.** The v1.9.2a
+manual still says "8 tracks" in 35 places and never mentions that OS 1.9.0 added four
+MIDI-only tracks, giving 12 in total. They sit after track 8, show up in both pattern and
+song mode, and cannot be hidden. Two other 1.9.x changes the manual does not carry: Render
+Selection now cuts hard at both ends (Export Song/Pattern still keeps tails), and Shift
+with the encoder makes *bigger* value jumps everywhere except tempo, where it gives 0.1
+BPM. All three are on the zine.
+
+Be careful which machine you are holding: *Tracker*, *Tracker+* and *Tracker Mini* are
+three different products on three separate firmware lines, each with its own manual
+(1.9.2a, 1.2.0a and 2.2.1b respectively at the time of writing). This zine is the original
+Tracker. Do not assume a combo carries across to the other two — check Polyend's downloads
+page for the manual that matches your unit.
 
 ---
 
@@ -192,6 +229,8 @@ Roughly 1,500 characters per panel at 6pt. What earns its place:
 What does not: marketing copy, spec-sheet trivia you will never act on, anything you would only read once.
 
 **Check the manufacturer's own documentation.** Gear is often a re-skin of another unit with every label renamed, and third-party write-ups happily use the wrong ones.
+
+Where a unit's OS is still being revised, say which version the zine was transcribed from — see the MPC One note above for what happens when the printed panel and the current OS disagree.
 
 ---
 

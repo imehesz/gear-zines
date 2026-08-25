@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPC One Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    
+        /* Two-column table for the 16-slot sound / effect lists. Break-inside
+           avoid keeps a row from splitting across the column gutter. */
+        ul.cols2 {
+            column-count: 2;
+            column-gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        ul.cols2 li {
+            break-inside: avoid;
+            padding-left: 0;
+            text-indent: 0;
+            font-size: 5.5pt;
+            margin-bottom: 0.5px;
+        }
+
+        ul.cols2 li:before {
+            content: none;
+        }
+
+        /* Slot number in the two-column tables. */
+        .n {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. Play &amp; Record</h2>
+            <div class="section">
+                <span class="bold">The Pads</span>
+                <ul class="tight">
+                    <li>Banks <b>A&ndash;D</b> on the bank buttons; for <b>E&ndash;H</b>, <span class="key">shift</span> + bank or double-press it. 8 &times; 16 = 128 pads.</li>
+                    <li><span class="key">full level</span> pins every hit to 127; <span class="key">shift</span> + it is half level (64). <b>Hold</b> it to set a custom user level.</li>
+                    <li><span class="key">16 level</span> copies the last pad across all 16 with one parameter ramping low&rarr;high &mdash; velocity, tune, filter, layer, attack, decay, probability or ratchet. Hold it + a pad to change which pad it clones.</li>
+                    <li><span class="key">note repeat</span> held + a pad retriggers it. Rate follows the tempo and the TC setting. <span class="key">shift</span> + <span class="key">note repeat</span> latches it on.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Recording a Sequence</span>
+                <ul class="tight">
+                    <li><span class="key">rec</span> arms &mdash; and <b>erases</b> the existing events on that pass. <span class="key">overdub</span> layers without erasing, and switches itself on after one full pass in record.</li>
+                    <li><span class="key">play</span> from the playhead, <span class="key">play start</span> from the top, and <span class="key">shift</span> + <span class="key">play start</span> for the metronome. <span class="key">stop</span> twice silences notes still ringing; <span class="key">shift</span> + <span class="key">stop</span> returns to 1:1:0.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Fixing It</span>
+                <ul class="tight">
+                    <li>Hold <span class="key">erase</span> + a pad while the sequence runs to rub that pad out as the playhead passes. Stopped, it opens the Erase window.</li>
+                    <li><span class="key">TC</span> opens Timing Correct: <b>Start</b> nudges events onto the grid, <b>End</b> and <b>Length</b> only move the ends. <span class="key">shift</span> + <span class="key">TC</span> toggles it.</li>
+                </ul>
+            </div>
+            <p class="tip">Hold <span class="key">shift</span> while turning the data dial or a Q-Link for fine resolution &mdash; 0.01 on tempo and tuning.</p>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. Trim &amp; Chop</h2>
+            <p><span class="key">sample edit</span> opens it. The <b>Trim/Chop</b> button in the lower-left corner swaps the two. Trim crops the ends off one sample; Chop cuts one sample into slices.</p>
+            <div class="section">
+                <span class="bold">The Audition Pads</span>
+                <ul class="cols2">
+                    <li><span class="n">09</span> play all</li>
+                    <li><span class="n">13</span> loop, held</li>
+                    <li><span class="n">10</span> play S&rarr;E</li>
+                    <li><span class="n">14</span> play to loop</li>
+                    <li><span class="n">11</span> S&rarr;E, held</li>
+                    <li><span class="n">15</span> play from loop</li>
+                    <li><span class="n">12</span> &mdash;</li>
+                    <li><span class="n">16</span> loop, latched</li>
+                </ul>
+                <ul class="tight">
+                    <li>Pads <b>1&ndash;4</b> are one-shot from start / to start / to end / from end. Pads <b>5&ndash;8</b> are the same four, held.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Chopping</span>
+                <ul class="tight">
+                    <li>Four methods in the lower-left selector: <b>Manual</b>, <b>Threshold</b> (transient detection &mdash; higher value, more slices), <b>Regions</b> (equal divisions), <b>BPM</b> (bars, beats, time div).</li>
+                    <li>Live slicing: press an <b>unlit</b> pad to start the sample, then press unlit pads during playback to drop markers. Green is the newest marker, yellow are existing ones. Pressing a <b>lit</b> pad restarts from that slice instead.</li>
+                    <li><b>Slice+</b> drops a marker at the cue playhead.</li>
+                    <li><span class="key">shift</span> + <b>0 Snap</b> forces edges onto zero-crossings. This is the cure for clicks.</li>
+                    <li><b>Link Slices</b> keeps slices edge to edge. Turn it <b>off</b> to make overlapping or non-contiguous slices.</li>
+                    <li><span class="key">shift</span> + <b>Clear All</b> wipes every marker.</li>
+                </ul>
+            </div>
+            <p class="tip"><span class="key">shift</span> + <b>Convert</b> &rarr; <i>New drum track using slices</i> builds a kit whose pads point at the slices &mdash; no new sample files. Tick <b>Create Events</b> and it writes a sequence playing them in order.</p>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. Sampling</h2>
+            <p><span class="key">sampler</span> opens Sampler mode.</p>
+            <div class="section">
+                <span class="bold">Recording</span>
+                <ul class="tight">
+                    <li>Set the source in the top-left menu: <b>Input 1,2</b> for the rear jacks, or <b>Resample</b> to record the MPC's own output.</li>
+                    <li>Level with the rear <span class="knob">rec vol</span> knob. The meter must not sit at the top.</li>
+                    <li>Drag the <b>threshold</b> slider low (around &minus;50 dB) and tap <b>Arm</b>. Recording begins when the input crosses it &mdash; or tap the round record button to start by hand.</li>
+                    <li>Tap stop and the <b>Keep or Discard</b> window appears: <b>Name</b>, <b>Track</b>, <b>Assign To Pad</b>, <b>Root Note</b>.</li>
+                    <li><b>Keep</b> puts it in the project. <b>Save</b> writes it to disk. <b>Edit</b> jumps straight into Sample Edit.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">The Other Two Ways In</span>
+                <ul class="tight">
+                    <li><b>Looper</b> &mdash; <span class="key">shift</span> + <span class="key">sampler</span>. Record and overdub audio in real time, then export the loop as a sample.</li>
+                    <li><b>Auto Sampler</b> &mdash; on the Sampler page. Plays a chromatic run at an external synth or a plugin and captures every note into a keygroup automatically.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Sample Processing</span>
+                <ul class="tight">
+                    <li><b>Process</b> in Sample Edit: pitch shift, time stretch, normalize, reverse, fade, gain, silence, and the rest.</li>
+                    <li>Pitch Shift transposes <b>without</b> changing the length; Time Stretch changes the length without changing the pitch.</li>
+                </ul>
+            </div>
+            <p class="tip"><b>Keep</b> is not <b>Save</b>. Keeping a sample only puts it in the project in RAM &mdash; power down without saving the project and the take is gone.</p>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Lexicon</h2>
+            <div class="section">
+                <span class="bold">The Buttons, and Their Red Halves</span>
+                <ul class="tight">
+                    <li><span class="key">menu</span> modes &middot; <span class="key">shift</span> preferences</li>
+                    <li><span class="key">main</span> main mode &middot; <span class="key">shift</span> grid view</li>
+                    <li><span class="key">browse</span> browser &middot; <span class="key">shift</span> <b>save project</b></li>
+                    <li><span class="key">track mix</span> channel mixer &middot; <span class="key">shift</span> pad mixer</li>
+                    <li><span class="key">track mute</span> &middot; <span class="key">shift</span> pad mute</li>
+                    <li><span class="key">next seq</span> &middot; <span class="key">shift</span> XYFX</li>
+                    <li><span class="key">step seq</span> &middot; <span class="key">shift</span> automation read/write</li>
+                    <li><span class="key">TC</span> timing correct &middot; <span class="key">shift</span> TC on/off</li>
+                    <li><span class="key">sampler</span> &middot; <span class="key">shift</span> looper</li>
+                    <li><span class="key">sample edit</span> &middot; <span class="key">shift</span> q-link edit</li>
+                    <li><span class="key">prog edit</span> track edit &middot; <span class="key">shift</span> MIDI control</li>
+                    <li><span class="key">16 level</span> &middot; <span class="key">shift</span> pad perform</li>
+                    <li><span class="key">full level</span> &middot; <span class="key">shift</span> half level</li>
+                    <li><span class="key">copy</span> pad to pad &middot; <span class="key">shift</span> delete</li>
+                    <li><span class="key">note repeat</span> &middot; <span class="key">shift</span> latch it</li>
+                    <li><span class="key">undo</span> &middot; <span class="key">shift</span> redo</li>
+                    <li><span class="key">tap</span> tap tempo &middot; <span class="key">shift</span> sequence vs. global tempo</li>
+                    <li><span class="key">q-link</span> next knob column &middot; <span class="key">shift</span> previous</li>
+                    <li>Pressing the <span class="knob">data dial</span> is Enter.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Numbers</span>
+                <ul class="tight">
+                    <li>16 velocity- <b>and pressure</b>-sensitive RGB pads, 8 banks. 4 touch-sensitive Q-Links across 4 columns. 7&Prime; touchscreen.</li>
+                    <li>Up to <b>128 tracks</b> per project. 2 GB RAM, 2 GB user storage (One+: 16 GB, 7.8 GB user). Mains only &mdash; no battery, no speakers.</li>
+                </ul>
+            </div>
+            <p class="tip">On OS 3 the panel still says <b>Prog Edit</b>, but it opens <b>Track Edit</b>: what 2.x called a program is now a track.</p>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. Tracks, Sequences &amp; Saving</h2>
+            <div class="section">
+                <span class="bold">Six Kinds of Track</span>
+                <ul class="tight">
+                    <li><b>Drum</b> &mdash; samples on pads. <b>Keygroup</b> &mdash; samples mapped chromatically, up to 128 keygroups of up to eight samples.</li>
+                    <li><b>Audio</b> &mdash; recorded audio or a resample. <b>Plugin</b>, <b>MIDI</b> (out to hardware), <b>CV</b> (out to modular).</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Arranging</span>
+                <ul class="tight">
+                    <li><span class="key">main</span> is home: sequence, track, bars, tempo.</li>
+                    <li><span class="key">next seq</span> turns the pads into sequence triggers, queued to the end of the bar &mdash; the song structure becomes a live performance.</li>
+                    <li><span class="key">track mute</span> and <span class="key">shift</span> + <span class="key">track mute</span> for pad mutes. Both take mute groups, and both quantize to the TC setting.</li>
+                    <li>Grid View (<span class="key">shift</span> + <span class="key">main</span>): pencil draws notes, eraser removes them. <span class="key">shift</span> + tap for Select All, Copy, Cut, Paste, Duplicate, Delete. <b>Nudge</b> moves by the TC value; hold <b>Don't Snap</b> to move by 4 ticks.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Saving &mdash; Read This One</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span> + <span class="key">browse</span> saves the project, samples and all.</li>
+                    <li><b>Auto Save is off until you turn it on</b>: Menu &rarr; Preferences &rarr; Project Load/Save &rarr; Auto Save Enabled, plus a timeout. Do it once, on a new machine, before anything else.</li>
+                    <li>Browser: <span class="key">shift</span> + <b>Load All</b> loads a whole folder; <span class="key">shift</span> + a folder button bookmarks where you are; <span class="key">shift</span> + <b>Delete File</b> removes one.</li>
+                    <li>Export: Main mode &rarr; the Project field &rarr; <b>Export</b>. Set an <b>Audio Tail</b> of a couple of seconds or reverbs get guillotined.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. Q-Links &amp; Performing</h2>
+            <div class="section">
+                <span class="bold">Q-Link Knobs</span>
+                <ul class="tight">
+                    <li>Four knobs, but sixteen parameters: they address one <b>column</b> at a time. <span class="key">q-link</span> steps to the next column, <span class="key">shift</span> + <span class="key">q-link</span> to the previous. The lights above the knobs say which column is live.</li>
+                    <li>They are touch-sensitive &mdash; resting a finger on one shows its parameter without moving it.</li>
+                    <li><span class="key">shift</span> + <span class="key">sample edit</span> is Q-Link Edit, where you assign what the columns control.</li>
+                    <li>In Trim and Chop, column 1 is the start point and column 2 the end point, coarse at the top and fine at the bottom.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Pad Perform</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span> + <span class="key">16 level</span>. Lays a scale or chords across the pads: <b>Chromatic</b>, <b>Notes</b>, <b>Chords</b>, <b>Chromatic Chords</b>, in a chosen key.</li>
+                    <li>It works on keygroup, plugin, MIDI and CV tracks. On a <b>drum track it does nothing</b> &mdash; the mode opens, the pads ignore it.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">XYFX and Automation</span>
+                <ul class="tight">
+                    <li><span class="key">shift</span> + <span class="key">next seq</span> turns the touchscreen into an XY effect pad, two parameters on two axes. Your finger moves are recorded as automation.</li>
+                    <li><span class="key">shift</span> + <span class="key">step seq</span> flips global automation between <b>Read</b> and <b>Write</b>. Left in Write, every knob you touch is being recorded.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Step Sequencer</span>
+                <ul class="tight">
+                    <li><span class="key">step seq</span> makes the 16 pads into 16 steps for the selected pad &mdash; drum-machine entry with no timing to get wrong.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Ports &amp; Setup</h2>
+            <div class="section">
+                <span class="bold">Round the Back</span>
+                <ul class="tight">
+                    <li><b>Inputs 1&ndash;2</b> and <b>Outputs 1&ndash;2</b>, balanced &frac14;&Prime; TRS. One stereo pair each &mdash; that is all of them.</li>
+                    <li><b>MIDI In</b> and <b>Out</b>, 5-pin DIN.</li>
+                    <li><b>4 &times; CV/Gate</b> on &#8539;&Prime; TS. One signal per jack, or <b>two</b> per jack with a TRS-to-dual-mono breakout (Hosa YMM-261) &mdash; eight in total.</li>
+                    <li><b>USB-B</b> to a computer for MIDI and audio. <b>USB-A</b> for a flash drive or a MIDI controller.</li>
+                    <li><b>Link</b> &mdash; Ethernet for Ableton Link. <b>MPC One only; the One+ dropped it.</b> Link also works over Wi-Fi.</li>
+                    <li>Front: SD card slot and &#8539;&Prime; headphones.</li>
+                    <li>Power: One is 19 V / 3.42 A, One+ is 12 V / 3 A, both centre-positive. Not interchangeable.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Cards &amp; Files</span>
+                <ul class="tight">
+                    <li><b>exFAT</b> is the recommended format. FAT32, NTFS and EXT4 also read and write; HFS+ is read-only.</li>
+                    <li>Audio in: WAV, AIF/AIFF, FLAC, MP3, OGG.</li>
+                    <li>Format a card from the Browser: <span class="key">shift</span> + <b>Format</b>.</li>
+                </ul>
+            </div>
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="mpc.jpg" alt="Woodcut of a hand striking a 4x4 grid of drum pads" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">AKAI MPC ONE &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
