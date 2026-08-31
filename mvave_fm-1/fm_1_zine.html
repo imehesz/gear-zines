@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M-Vave FM-1 Zine</title>
+    <!-- Using a print stylesheet to ensure it formats correctly on A4 -->
+    <style>
+        /* CSS resets and base styles */
+        * {
+            box-sizing: border-box;
+            /* Force the black label bars and key chips to survive printing,
+               so "Background graphics" doesn't have to be ticked by hand. */
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            color: #000000;
+            line-height: 1.15;
+            background-color: #f0f0f0; /* Grey background for previewing the A4 page */
+        }
+
+        :root {
+            /* ---- PAPER ----------------------------------------------------
+               US Letter landscape: 11in x 8.5in = 279.4 x 215.9mm.
+               This MUST match the paper physically in the tray, not just the
+               browser's "Paper size" dropdown.
+               For A4 landscape instead, swap to 297mm / 210mm and change the
+               @page size at the bottom of this stylesheet to `a4 landscape`. */
+            --sheet-w: 279.4mm;
+            --sheet-h: 215.9mm;
+
+            /* Panel grid derives from the sheet, so the panel edges always land
+               on the quarter lines where the paper actually creases. */
+            --col: calc(var(--sheet-w) / 4);
+            --row: calc(var(--sheet-h) / 2);
+
+            /* Padding on panel sides that face a FOLD (safe, ink can go close). */
+            --pad-in: 3mm;
+            /* Padding on panel sides that face the PAPER EDGE. Must clear the
+               printer's unprintable border (~4mm on a laser) plus a couple of mm
+               of sheet-feed registration drift. Raise this if text still clips. */
+            --pad-out: 10mm;
+        }
+
+        /* The sheet itself. Full bleed: no padding, so the panel grid can sit
+           on the true quarter lines where the paper actually creases. */
+        .page-container {
+            width: var(--sheet-w);
+            height: var(--sheet-h);
+            background-color: #ffffff;
+            position: relative;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1); /* Subtle shadow for preview */
+            padding: 0;
+        }
+
+        /*
+           8 panels (4 columns, 2 rows) on the sheet's exact quarter lines, so the
+           panel edges land where the folds land.
+             width  = 297 / 4 = 74.25mm      height = 210 / 2 = 105mm
+           Padding is asymmetric: the bottom of every panel's CONTENT faces a paper
+           edge (the top row is rotated 180deg, so its content-bottom is the sheet's
+           top edge), and the outer columns get --pad-out on their outward side too.
+        */
+        .panel {
+            position: absolute;
+            width: var(--col);
+            height: var(--row);
+            padding: var(--pad-in) var(--pad-in) var(--pad-out) var(--pad-in);
+            overflow: hidden;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 11pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            border-bottom: 2px solid #000;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        h2 {
+            font-size: 7pt;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+            font-weight: bold;
+            background: #000;
+            color: #fff;
+            padding: 2px 5px;
+            display: inline-block;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0.3px;
+        }
+
+        p {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            text-align: left;
+        }
+
+        ul {
+            font-size: 6pt;
+            margin: 0 0 3px 0;
+            padding-left: 0;
+            list-style-type: none;
+        }
+
+        li {
+            margin-bottom: 1.5px;
+            padding-left: 8px;
+            text-indent: -8px;
+        }
+
+        li:before {
+            content: "\2022  ";
+            font-weight: bold;
+        }
+
+        /* Glossary / combo rows: no bullet, hanging indent for the key chip */
+        ul.tight li {
+            padding-left: 9px;
+            text-indent: -9px;
+            margin-bottom: 1px;
+        }
+
+        ul.tight li:before {
+            content: none;
+        }
+
+        .key {
+            background-color: #000;
+            color: #fff;
+            padding: 1px 3px;
+            border-radius: 2px;
+            font-weight: bold;
+            font-size: 5pt;
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: lowercase;
+            white-space: nowrap;
+        }
+
+        .knob {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            font-size: 5.5pt;
+            border: 1px solid #000;
+            border-radius: 6px;
+            padding: 0 3px;
+            white-space: nowrap;
+        }
+
+        .section {
+            margin-bottom: 4px;
+        }
+
+        .bold {
+            font-weight: bold;
+            font-size: 6.5pt;
+            display: block;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 2px;
+            padding-bottom: 1px;
+        }
+
+        /* Pro-tip callout */
+        .tip {
+            font-size: 5.5pt;
+            font-style: italic;
+            border-left: 2px solid #000;
+            padding-left: 4px;
+            margin: 4px 0 0 0;
+        }
+
+        .tip:before {
+            content: "TIP ";
+            font-style: normal;
+            font-weight: bold;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        /*
+           Panel Positioning for the Zine Layout
+           Bottom row (Pages 6, 7, 8, 1) are right-side up.
+           Top row (Pages 5, 4, 3, 2) are upside down.
+        */
+
+        /* Top row: rotated 180deg. Their content-LEFT renders at the box's right,
+           so the outer column needs padding-RIGHT to clear the sheet's left edge. */
+        .p5 { left: 0;                      top: 0; transform: rotate(180deg); padding-right: var(--pad-out); }
+        .p4 { left: var(--col);             top: 0; transform: rotate(180deg); }
+        .p3 { left: calc(var(--col) * 2);   top: 0; transform: rotate(180deg); }
+        .p2 { left: calc(var(--col) * 3);   top: 0; transform: rotate(180deg); padding-left: var(--pad-out); }
+
+        /* Bottom row: upright, so outward side is the intuitive one. */
+        .p6 { left: 0;                      top: var(--row); padding-left: var(--pad-out); }
+        .p7 { left: var(--col);             top: var(--row); }
+        .p8 { left: calc(var(--col) * 2);   top: var(--row); }
+        .p1 { left: calc(var(--col) * 3);   top: var(--row); padding-right: var(--pad-out); }
+
+        /* Fold and Cut Lines */
+        .cut-line {
+            position: absolute;
+            top: var(--row);                /* exact vertical centre of the sheet */
+            left: var(--col);               /* 1st fold */
+            width: calc(var(--col) * 2);    /* to the 3rd fold: middle two columns */
+            height: 0;
+            border-top: 2px dashed #000;
+            z-index: 10;
+        }
+
+        /* Inset 8mm from the sheet edges so the guides themselves aren't clipped. */
+        .fold-line-1 { position: absolute; top: 8mm; bottom: 8mm; left: var(--col); border-left: 1px dotted #ccc; }
+        .fold-line-2 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 2); border-left: 1px dotted #ccc; }
+        .fold-line-3 { position: absolute; top: 8mm; bottom: 8mm; left: calc(var(--col) * 3); border-left: 1px dotted #ccc; }
+        .fold-line-horiz { position: absolute; left: 8mm; right: 8mm; top: var(--row); border-top: 1px dotted #ccc; }
+
+        /* Folding Instructions Box on Page 8 */
+        .folding-box {
+            position: absolute;
+            bottom: var(--pad-out);
+            left: var(--pad-in);
+            right: var(--pad-in);
+            border: 1px solid #000;
+            padding: 3px 5px;
+            font-size: 6pt;
+            background: #f9f9f9;
+        }
+
+        .folding-box p {
+            margin: 0 0 2px 0;
+            font-weight: bold;
+            text-align: center;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+            font-size: 6pt;
+        }
+
+        .folding-box ol {
+            margin: 0;
+            padding-left: 12px;
+            line-height: 1.2;
+            font-size: 5.5pt;
+        }
+
+        .folding-box ol li {
+            margin-bottom: 1px;
+            padding-left: 0;
+            text-indent: 0;
+        }
+
+        .folding-box ol li:before {
+            content: none;
+        }
+
+        /* Cover caption strip */
+        .cover-caption {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 6pt;
+            text-transform: uppercase;
+            text-align: center;
+            letter-spacing: 0.5px;
+            border-top: 1px solid #000;
+            padding-top: 2px;
+            margin-top: 2px;
+        }
+
+        /*
+           Print Styles.
+           The .page-container is already a full-bleed sheet at --sheet-w x --sheet-h,
+           so printing needs NO repositioning: set the page margin to zero and the
+           container lands 1:1 on the paper. This keeps the centre folds exactly on
+           the sheet's half lines regardless of driver.
+           >>> Print with Margins: None and Scale: 100% (Default). <<<
+        */
+        @media print {
+            @page {
+                /* US Letter landscape. Change to `a4 landscape` together with
+                   --sheet-w / --sheet-h above if you switch paper. */
+                size: 11in 8.5in;
+                margin: 0;
+            }
+            html, body {
+                width: var(--sheet-w);
+                height: var(--sheet-h);
+                margin: 0;
+                padding: 0;
+                background: #ffffff;
+            }
+            .page-container {
+                box-shadow: none;
+                overflow: hidden;
+                page-break-after: avoid;
+                page-break-inside: avoid;
+            }
+        }
+    
+        /* Two-column table for the 16-slot sound / effect lists. Break-inside
+           avoid keeps a row from splitting across the column gutter. */
+        ul.cols2 {
+            column-count: 2;
+            column-gap: 5px;
+            margin-bottom: 3px;
+        }
+
+        ul.cols2 li {
+            break-inside: avoid;
+            padding-left: 0;
+            text-indent: 0;
+            font-size: 5.5pt;
+            margin-bottom: 0.5px;
+        }
+
+        ul.cols2 li:before {
+            content: none;
+        }
+
+        /* Slot number in the two-column tables. */
+        .n {
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+        }
+</style>
+</head>
+<body>
+    <div class="page-container">
+        <!-- Fold and Cut Guides -->
+        <div class="fold-line-1"></div>
+        <div class="fold-line-2"></div>
+        <div class="fold-line-3"></div>
+        <div class="fold-line-horiz"></div>
+        <div class="cut-line"></div>
+
+        <!-- PAGE 5 -->
+        <div class="panel p5">
+            <h2>5. ENV &amp; LFO</h2>
+            <div class="section">
+                <span class="bold">ENV &mdash; Not a DX7 Control</span>
+                <ul class="tight">
+                    <li>Knobs 1&ndash;4 are <b>Attack</b>, <b>Decay</b>, <b>Sustain</b>, <b>Release</b>, each <b>0&ndash;8</b>, drawn as blocks. 0 attack is instant, 8 release is a long fade.</li>
+                    <li>A DX7 voice has <b>no ADSR at all</b> &mdash; its whole shape lives in the six operator envelopes. This layer is the FM-1's own, sitting over the top, and the manual does not say how the two combine.</li>
+                    <li>So a note that will not die has two suspects: <b>Release</b> here, and <b>Rate 4 / Level 4</b> on the carriers over in <span class="key">edit</span>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">LFO &mdash; Page 1</span>
+                <ul class="tight">
+                    <li><b>Wave</b> Triangle, Saw Down, Saw Up, Square, Sine, Sample &amp; Hold.</li>
+                    <li><b>Speed</b> 0&ndash;99 &middot; <b>PMD</b> 0&ndash;99, pitch depth &middot; <b>AMD</b> 0&ndash;99, amplitude depth.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">LFO &mdash; Page 2</span>
+                <ul class="tight">
+                    <li><b>Delay</b> 0&ndash;99 is the fade-in before the LFO arrives. It is what makes vibrato sound played rather than switched on.</li>
+                    <li><b>Pitch Sens</b> 0&ndash;7 &middot; <b>Lfo Sync</b> 0 free, 1 restarts on each note &middot; <b>Osc Sync</b> 0 free-running, 1 resets oscillator phase per note.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Traps</span>
+                <ul class="tight">
+                    <li>On a DX7, PMD and Pitch Sens <b>multiply</b>. Expect the same here: PMD at 99 with <b>Pitch Sens at 0 gives no vibrato whatsoever</b>. Set Pitch Sens first, then reach for PMD.</li>
+                    <li><b>Osc Sync also lives in</b> <span class="key">edit</span> <b>&rarr; GLO</b>. One voice parameter, two doors.</li>
+                    <li>Speed is a bare number, not a note division. Nothing in the LFO follows tempo.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 4 -->
+        <div class="panel p4">
+            <h2>4. The Effect Chain</h2>
+            <div class="section">
+                <span class="bold">Six Slots</span>
+                <ul class="tight">
+                    <li><span class="key">fx</span> opens a 3&times;2 grid: <b>Filter, Reverb, Delay, Distortion, Chorus, Phaser</b>. Bright box = on, dim = off, blinking dot = selected. <span class="key">fx</span> again returns Home.</li>
+                    <li><span class="knob">SELECT</span> moves the dot between slots &mdash; in this mode only, it does not change page.</li>
+                    <li><b>Knob 4 is the on/off for every effect</b>, clockwise on, counter-clockwise off. It is never a sound control, so each effect only ever has three parameters &mdash; and Filter and Reverb spend one of those on a <b>Type</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Knobs 1 &middot; 2 &middot; 3</span>
+                <ul class="tight">
+                    <li><b>FILTER</b> Type LP/BP/HP &middot; CutOff 100Hz&ndash;20kHz, 100 log steps &middot; Q 0&ndash;100</li>
+                    <li><b>REVERB</b> Type Room/Hall/Plate &middot; Decay &middot; Mix &mdash; both 0&ndash;100% in 10% steps</li>
+                    <li><b>DELAY</b> Decay &middot; Rate &middot; Mix</li>
+                    <li><b>DISTORTION</b> Gain &middot; Tone &middot; Level</li>
+                    <li><b>CHORUS</b> Freq &middot; Depth &middot; Mix</li>
+                    <li><b>PHASER</b> Freq &middot; Depth &middot; Mix</li>
+                    <li>All unmarked ranges are 0&ndash;100%. The bottom bar shows the real value &mdash; <b>CutOff: 1004Hz</b>, <b>Mix: 70%</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Reordering &mdash; SEL</span>
+                <ul class="tight">
+                    <li><span class="key">sel</span> does nothing outside FX mode.</li>
+                    <li>Press <span class="key">sel</span> to <b>grab</b> the selected effect: the dot stops blinking and goes solid, SEL LED on.</li>
+                    <li>Turn <span class="knob">SELECT</span> &mdash; the grabbed effect swaps with its neighbour and walks along the chain.</li>
+                    <li>Press <span class="key">sel</span> again to drop it there. LED off.</li>
+                </ul>
+            </div>
+            <p class="tip">The chain runs 1 to 6 in slot order. Distortion after Reverb is a different machine from Distortion before it &mdash; <span class="key">sel</span> is the only way there.</p>
+        </div>
+
+        <!-- PAGE 3 -->
+        <div class="panel p3">
+            <h2>3. Presets, Banks &amp; Saving</h2>
+            <div class="section">
+                <span class="bold">128 Voices, No Bank Button</span>
+                <ul class="tight">
+                    <li><span class="knob">PRESETS</span> scrolls 001&ndash;128 and wraps both ways. Every click <b>loads immediately</b> &mdash; you hear it as you turn.</li>
+                    <li>A SysEx import writes a <b>32-voice bank</b> into a slot you choose, <b>A / B / C / D</b>. Four slots of 32 is exactly the 128, so an imported bank lands in one quarter of the list and you reach it by <b>scrolling to it</b>. There is no bank key and no categories.</li>
+                    <li>The top bar always shows the loaded number and name.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Saving</span>
+                <ul class="tight">
+                    <li><span class="key">save</span> is <b>press and hold</b>. A tap does nothing. It commits voice edits, effect settings, sequencer patterns and global settings; the LED lights and the screen says <b>Preset Saved</b>.</li>
+                    <li><span class="key">glo</span> &rarr; page 2 &rarr; Knob 2 is <b>Globe Save</b>, which writes the global settings to flash on their own.</li>
+                    <li>Panel Transpose is the exception &mdash; the manual says it saves to global settings by itself.</li>
+                    <li><b>Factory reset:</b> <span class="key">glo</span> &rarr; page 2 &rarr; Knob 1 clockwise, then <b>Knob 4 confirms, Knob 1 cancels</b>. It restores all 128 voices, so any imported banks go with them.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Three Things Called Transpose</span>
+                <ul class="tight">
+                    <li><span class="key">oct&minus;</span> <span class="key">oct+</span> &mdash; &plusmn;3 <b>octaves</b>. Global, not part of the voice.</li>
+                    <li><span class="key">oct</span>+<span class="knob">ALGORITHM</span> &mdash; &plusmn;12 <b>semitones</b>. Global, auto-saved.</li>
+                    <li><span class="key">edit</span> &rarr; GLO &rarr; <b>Transpose 0&ndash;48</b> &mdash; this one is <b>inside the voice</b>, the DX7's own key transpose, and 24 is centre.</li>
+                    <li>Chasing a tuning problem means checking all three. <span class="key">oct&minus;</span>+<span class="key">oct+</span> zeroes the first two at a stroke.</li>
+                </ul>
+            </div>
+            <p class="tip">Nothing on this machine has an undo. Park experiments on a preset you are willing to lose.</p>
+        </div>
+
+        <!-- PAGE 2 -->
+        <div class="panel p2">
+            <h2>2. Anatomy &amp; Notation</h2>
+            <div class="section">
+                <span class="bold">One Pot, Seven Encoders, Twelve Buttons</span>
+                <ul class="tight">
+                    <li><span class="knob">MASTER</span> is the only potentiometer. The other seven &mdash; <span class="knob">SELECT</span> <span class="knob">PRESETS</span> <span class="knob">ALGORITHM</span> and <span class="knob">KNOB 1</span>&ndash;<span class="knob">4</span> &mdash; are endless: nothing has a position, and the screen is the only truth.</li>
+                    <li>Top row: <span class="key">fx</span> <span class="key">sel</span> <span class="key">env</span> <span class="key">lfo</span> <span class="key">edit</span> <span class="key">glo</span>. Bottom row: <span class="key">home</span> <span class="key">save</span> <span class="key">arp</span> <span class="key">seq</span> <span class="key">play/stop</span> <span class="key">rec</span>. Every one toggles &mdash; press it again, or <span class="key">home</span>, for the oscilloscope.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">SELECT Is the Page Key</span>
+                <ul class="tight">
+                    <li>Most modes have two pages. Clockwise is page 2, back is page 1; the bottom bar reads <b>1/2 Arpeggio</b>.</li>
+                    <li>Two exceptions: in <b>FX</b> it walks the six effect slots; in <b>EDIT</b> it pages the selected operator, up to six deep.</li>
+                    <li>Knobs 1&ndash;4 do whatever the bottom bar says, and that changes with every mode <b>and every page</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Octave, Transpose, Reset</span>
+                <ul class="tight">
+                    <li><span class="key">oct&minus;</span> <span class="key">oct+</span> shift one octave per press, to &plusmn;3. The LED lights on the side you have gone: off = 0, slow blink &plusmn;1, fast blink &plusmn;2, solid &plusmn;3.</li>
+                    <li>Hold <span class="key">oct&minus;</span> or <span class="key">oct+</span> and turn <span class="knob">ALGORITHM</span> for <b>transpose</b>, 0 to 12 semitones; the held button picks the direction.</li>
+                    <li><span class="key">oct&minus;</span>+<span class="key">oct+</span> resets octave <b>and</b> transpose to 0. The one combo worth memorising.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">The Two Long Presses</span>
+                <ul class="tight">
+                    <li><span class="key">home</span> held toggles <b>Bluetooth</b> &mdash; blinking = on but not connected, solid = connected, off = off. <span class="key">save</span> held writes to flash.</li>
+                </ul>
+            </div>
+            <p class="tip"><span class="knob">ALGORITHM</span> is live &mdash; one click rewires the voice you are holding, with no undo and no confirmation.</p>
+        </div>
+
+        <!-- PAGE 6 -->
+        <div class="panel p6">
+            <h2>6. EDIT &mdash; the DX7 Underneath</h2>
+            <p>Press <span class="key">edit</span> and the labelled keys become the section picker: <b>OP1&ndash;OP6</b>, <b>PIT</b>, <b>GLO</b>, <b>MONO</b>, <b>POLY</b>. Selectable keys blink, the chosen one goes solid. <span class="knob">SELECT</span> pages, Knobs 1&ndash;4 edit, <span class="key">edit</span> leaves.</p>
+            <div class="section">
+                <span class="bold">Six Pages Per Operator</span>
+                <ul class="tight">
+                    <li><b>1</b> Rate 1&ndash;4 (0&ndash;99) &mdash; envelope rates</li>
+                    <li><b>2</b> Level 1&ndash;4 (0&ndash;99) &mdash; envelope levels</li>
+                    <li><b>3</b> Detune 0&ndash;14 &middot; FreqCoarse 0&ndash;31 &middot; FreqFine 0&ndash;99 &middot; OscMode Ratio/Fixed</li>
+                    <li><b>4</b> A ModSens 0&ndash;3 &middot; KeyVelocity 0&ndash;7 &middot; Out Level 0&ndash;99</li>
+                    <li><b>5</b> L Depth &middot; R Depth (0&ndash;99) &middot; BreakPoint A-1 to C7</li>
+                    <li><b>6</b> L Curve &middot; R Curve (&minus;LN/&minus;EX/+LN/+EX) &middot; RateScale 0&ndash;7</li>
+                    <li><b>PIT</b> page 1 Rate 1&ndash;4, page 2 Level 1&ndash;4 &mdash; the pitch envelope.</li>
+                    <li><b>GLO</b> Algorithm 0&ndash;31 &middot; Feedback 0&ndash;7 &middot; Osc Sync &middot; Transpose 0&ndash;48.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Traps</span>
+                <ul class="tight">
+                    <li>The same 32 algorithms are <b>numbered twice</b>: 01&ndash;32 on the <span class="knob">ALGORITHM</span> encoder, 0&ndash;31 in EDIT &rarr; GLO. Subtract one.</li>
+                    <li><b>Detune 0&ndash;14 is the DX7's &minus;7&hellip;+7. Centre is 7, not 0.</b></li>
+                    <li>There is no operator on/off switch. Mute one by taking its <b>Out Level to 0</b>.</li>
+                    <li>Out Level is <b>volume</b> on a carrier and <b>brightness</b> on a modulator &mdash; which one depends on the algorithm.</li>
+                    <li>Feedback belongs to whichever operator the current algorithm loops back &mdash; change algorithm and it moves.</li>
+                </ul>
+            </div>
+            <p class="tip">Every parameter above is a Yamaha DX7 voice parameter renamed. Forty years of DX7 programming guides apply here one for one, and any DX7 bank loads over SysEx.</p>
+        </div>
+
+        <!-- PAGE 7 -->
+        <div class="panel p7">
+            <h2>7. ARP &amp; SEQ</h2>
+            <p>Never both at once: with SEQ running <span class="key">arp</span> answers <b>"Disable SEQ to enter"</b>, and with ARP running <span class="key">seq</span> answers <b>"Disable ARP to enter"</b>. Turn the running one off first.</p>
+            <div class="section">
+                <span class="bold">ARP</span>
+                <ul class="tight">
+                    <li><b>Page 1</b> Mode &middot; Octave 1&ndash;4 &middot; Rate &middot; Tempo 30&ndash;300 BPM</li>
+                    <li><b>Page 2</b> Gate 20&ndash;100% &middot; Swing 50&ndash;75% &middot; Latch</li>
+                    <li><b>Modes:</b> <b>Up</b> &middot; <b>Down</b> &middot; <b>Inclusive</b> bouncing, endpoints included &middot; <b>Exclusive</b> bouncing without repeating them &middot; <b>Random</b> &middot; <b>Order</b>, as you pressed them &middot; <b>Repeat</b>, each note repeated before moving on.</li>
+                    <li><b>Latch</b> on holds the pattern after you let go; press new keys to replace it, Latch off to stop.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">SEQ</span>
+                <ul class="tight">
+                    <li>Press <span class="key">seq</span>: SEQ and STOP light, and the keys become <b>16 step lamps</b>.</li>
+                    <li><span class="key">rec</span> starts recording (REC + PLAY lit). Play notes &mdash; each lands on the <b>next step</b>. <span class="key">rec</span> again drops you into playback.</li>
+                    <li><span class="key">play/stop</span> toggles the transport. Step LEDs: <b>solid</b> filled, <b>dark</b> empty, <b>blinking</b> playhead.</li>
+                    <li><b>Page 1</b> Pattern 1&ndash;16 &middot; Clear &middot; Rate &middot; Tempo. <b>Page 2</b> Gate &middot; Swing. 16 patterns, held in flash.</li>
+                    <li><b>Clear is Knob 2, right beside Pattern on Knob 1</b>, and it wipes whichever pattern is selected. Read the number first.</li>
+                    <li><span class="key">play/stop</span> or <span class="key">rec</span> with SEQ off only says <b>"Enable SEQ first"</b>.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Traps</span>
+                <ul class="tight">
+                    <li>Tempo is a knob, 30&ndash;300. <b>The manual documents no MIDI clock input</b> &mdash; plan on the FM-1 running to its own clock, not a DAW's.</li>
+                    <li>Entry is sequential only. Nothing documents jumping to a step or entering a rest. Gate and Swing are per-pattern, not per-step.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- PAGE 8 -->
+        <div class="panel p8">
+            <h2>8. Globe, MIDI &amp; Jacks</h2>
+            <div class="section">
+                <span class="bold">GLO</span>
+                <ul class="tight">
+                    <li><b>Page 1</b> Note Channel 1&ndash;16 &middot; Effect Channel 1&ndash;16 &middot; Pitch Bend Up 1&ndash;24 &middot; Down 1&ndash;24, set <b>separately</b>. <b>Page 2</b> Reset Patches (K1) &middot; Globe Save (K2).</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">MIDI</span>
+                <ul class="tight">
+                    <li>Three inputs are live at once: <b>USB-C</b>, <b>BLE</b> (long-press <span class="key">home</span>), and <b>3.5mm MIDI IN</b> through a 3.5mm-to-DIN adapter.</li>
+                    <li><b>There is no MIDI OUT jack.</b> Keyboard, arpeggiator and sequencer notes leave over USB and Bluetooth only, on the Note Channel.</li>
+                    <li>Receives note on/off with velocity, pitch bend, CC and SysEx dumps. The only CC channel the manual names is the <b>Effect Channel</b> &mdash; treat CC as an effects hook, not a synth-parameter one.</li>
+                    <li><b>SysEx:</b> send a 32-voice DX7 bank and a bank screen appears; Knobs 1&ndash;4 pick slot A/B/C/D.</li>
+                    <li>Sounding note = <b>key + 53 + (octave &times; 12) + transpose</b>. At octave 0 the 27 keys cover F3 to G5.</li>
+                </ul>
+            </div>
+            <div class="section">
+                <span class="bold">Jacks &amp; Power</span>
+                <ul class="tight">
+                    <li>Audio out is 3.5mm and wants a <b>standard TRS plug</b>. The manual warns other connectors can add noise <b>and can fail to mute the speaker</b> &mdash; on a TS cable, expect it to keep singing.</li>
+                    <li>USB-C carries power and USB MIDI; the power switch is on the rear. 2000mAh gives about 12 hours, and <b>LOW BATTERY</b> holds the whole screen until you charge.</li>
+                </ul>
+            </div>
+            <div class="folding-box">
+                <p>FOLDING INSTRUCTIONS</p>
+                <ol>
+                    <li>Fold in half lengthwise (hotdog), unfold.</li>
+                    <li>Fold in half widthwise (hamburger).</li>
+                    <li>Fold outer flaps back (accordion style).</li>
+                    <li>Cut the thick dashed center line.</li>
+                    <li>Push ends to form a cross shape.</li>
+                    <li>Fold pages around to form the booklet.</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- PAGE 1 (Cover) -->
+        <div class="panel p1">
+            <div style="width: 100%; height: 100%; display: flex; flex-direction: column; overflow: hidden; border: none; margin:0; background-color: #fff; padding: 0">
+                <div style="flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="fm1.jpg" alt="Woodcut of a small handheld FM synthesizer, six operator stacks radiating sine waves above its keys" style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+                </div>
+                <div class="cover-caption">M-VAVE FM-1 &middot; pocket reference</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
