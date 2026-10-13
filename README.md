@@ -22,6 +22,8 @@ The goal is not to reproduce the manual. It is to distill the parts you actually
 |---|---|---|
 | [`akai_mpc-one/`](akai_mpc-one/) | Akai MPC One / MPC One+ | US Letter landscape |
 | [`dirtywave_m8/`](dirtywave_m8/) | Dirtywave M8 (Model:01 / Model:02) | US Letter landscape |
+| [`mvave_fm-1/`](mvave_fm-1/) | M-Vave FM-1 | US Letter landscape |
+| [`mvave_fm-1_sloop/`](mvave_fm-1_sloop/) | M-Vave FM-1 running SLOOP 2.6 firmware | US Letter landscape |
 | [`polyend_tracker/`](polyend_tracker/) | Polyend Tracker | US Letter landscape |
 | [`te_ep-1320_medieval/`](te_ep-1320_medieval/) | Teenage Engineering EP–1320 Medieval | US Letter landscape |
 | [`te_po-14_sub/`](te_po-14_sub/) | Teenage Engineering PO-14 sub | US Letter landscape |
@@ -53,9 +55,9 @@ PO-14. Each zine states its own unit's combos; do not carry them across.
 Covers are 1-bit line art on purpose. The whole point is a machine you can feed one
 sheet of paper — these print on a black-and-white laser with no grey to smear.
 
-### On the MPC One, the M8 and the Tracker
+### On the MPC One, the M8, the Tracker and the FM-1
 
-These three do not share a chassis with anything else here, and all are moving targets,
+These four do not share a chassis with anything else here, and all are moving targets,
 so each zine states the documentation it was written against.
 
 The **MPC One** zine follows **MPC Standalone OS 3.x**. The silkscreen on the panel is
@@ -86,6 +88,42 @@ three different products on three separate firmware lines, each with its own man
 (1.9.2a, 1.2.0a and 2.2.1b respectively at the time of writing). This zine is the original
 Tracker. Do not assume a combo carries across to the other two — check Polyend's downloads
 page for the manual that matches your unit.
+
+The **M-Vave FM-1** zine is transcribed from the **English section of the FM-1 user manual**
+as shipped in mid-2026. That manual carries no version or revision number, so there is
+nothing to pin the zine to but the shipping unit — treat anything here as checkable against
+your own hardware first.
+
+Under the renamed labels this is a **Yamaha DX7 voice**, parameter for parameter: EG rates
+and levels, oscillator ratio/fixed with coarse, fine and detune, output level, amp-mod and
+velocity sensitivity, keyboard level scaling with its breakpoint and two curves, rate
+scaling, the pitch envelope, and algorithm with feedback. The zine says so on page 6,
+because it is the single most useful thing to know about the machine — every DX7
+programming guide ever written applies here, and DX7 32-voice banks load over SysEx.
+
+Two things the zine states that the manual does not spell out. **The 128 presets are four
+SysEx bank slots of 32** — A/B/C/D, 4 × 32 = 128 — so an imported bank lands in one quarter
+of the preset list and there is no bank key to reach it with; you scroll. And **the same 32
+algorithms are numbered twice**: 01–32 on the `ALGORITHM` encoder, 0–31 in `EDIT` → `GLO`.
+
+Where the zine says the manual is silent, it says so rather than guessing — there is no
+documented MIDI clock input, so the arpeggiator and sequencer are marked as running to
+their own tempo knob, and no documented way to select a step, edit one, or enter a rest.
+
+### On SLOOP
+
+The **`mvave_fm-1_sloop`** zine is for the same hardware running **SLOOP 2.6**, a free,
+unofficial, open-source (GPL-3.0) firmware by isod89, built on Felucca by Hügelton
+Instruments ([github.com/isod89/sloop-fm1](https://github.com/isod89/sloop-fm1)). It is
+transcribed from the project's own *SLOOP 2.6 — The Complete Guide*.
+
+It shares nothing with the stock zine but the case. SLOOP turns the FM-1 into a four-track
+loop groovebox, three synth tracks and a drum track, and every button has a second job
+when held, so the panel silkscreen is wrong almost everywhere. Use the zine that matches
+the firmware on your unit: HOME held, then SYSTEM → ABOUT, shows the SLOOP version.
+
+SLOOP moves fast, with nine releases in its first week. Where a combo here disagrees with
+your unit, check the GUIDE.md that matches its version.
 
 ---
 
